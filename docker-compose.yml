@@ -4,6 +4,9 @@ services:
   app:
     build: ./app
     container_name: uwsgi_app
+    volumes:
+      - ./app:/app
+      - ./app/data:/app/data
     expose:
       - "5000"
     user: "33:33"

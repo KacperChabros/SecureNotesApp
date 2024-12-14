@@ -1,1 +1,4 @@
 certs/
+app/.env
+app/data
+app/__pycache__/

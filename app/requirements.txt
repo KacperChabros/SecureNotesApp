@@ -1,2 +1,4 @@
 flask
 uwsgi
+python-dotenv
+flask-login
