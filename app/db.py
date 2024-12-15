@@ -18,19 +18,12 @@ def init_db():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT NOT NULL UNIQUE,
                 email TEXT NOT NULL UNIQUE,
-                passwordHash TEXT NOT NULL
+                passwordHash TEXT NOT NULL,
+                publicKey TEXT NOT NULL,
+                privateKeyEncrypted TEXT NOT NULL,
+                totpSecretEncrypted TEXT NOT NULL         
             );
         ''')
-        # db.cursor().execute('''
-        #     CREATE TABLE IF NOT EXISTS users (
-        #         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        #         username TEXT NOT NULL UNIQUE,
-        #         email TEXT NOT NULL UNIQUE,
-        #         passwordHash TEXT NOT NULL,
-        #         publicKey TEXT NOT NULL,
-        #         privateKeyEncrypted TEXT NOT NULL
-        #     );
-        # ''')
         db.cursor().execute('''
             CREATE TABLE IF NOT EXISTS notes (
                 noteId INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -56,22 +49,7 @@ def init_db():
                 FOREIGN KEY (userId) REFERENCES users(id)
             );
         ''')
-        db.cursor().execute("INSERT INTO users(username, email, passwordHash) VALUES('pierwszyuser', 'emailaa', 'aaahgasglotoo')")
-        #db.cursor().execute("INSERT INTO users(username) VALUES('drugiuser')")
+
         db.commit()
         db.close()
 
-
-def get_user(username):
-    """Method for getting user by username"""
-    with current_app.app_context():
-        db = get_connection()
-        cursor = db.cursor()
-        
-        cursor.execute("SELECT * FROM users WHERE username=?", (username,))
-        
-        row = cursor.fetchone()
-        
-        db.close()
-
-        return row

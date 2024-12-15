@@ -2,3 +2,7 @@ flask
 uwsgi
 python-dotenv
 flask-login
+pyotp
+bleach
+passlib
+pycryptodome

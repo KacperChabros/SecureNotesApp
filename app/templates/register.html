@@ -4,11 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Register page</title>
+    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.5/purify.min.js"></script> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/he/1.2.0/he.min.js"></script>
 </head>
 <body>
     <h2>Register page</h2>
     
-    <form action="/register" method="POST">
+    <form id="registerForm" action="/register" method="POST">
         <label for="username">Username:</label><br>
         <input type="text" id="username" name="username" required><br><br>
         
@@ -29,6 +31,83 @@
     {% if error %}
 	<p style="color:red;">{{error}}</p>
     {% endif %}
+    <p id="errorMessage" style="color: red;"></p>
+    
+    {% if errors %}
+    <ul>
+    {% for field, error in errors.items() %}
+        <li><strong>{{ field.capitalize() }}:</strong> {{ error }}</li>
+        {% endfor %}
+        </ul>
+    {% endif %}
+
+    <script>
+        document.getElementById("registerForm").addEventListener("submit", function (event) {
+            event.preventDefault();
+
+            const errorMessage = document.getElementById("errorMessage");
+            const username = he.encode(document.getElementById("username").value.trim(), { useNamedReferences: true });
+            const email = he.encode(document.getElementById("email").value.trim(),{ useNamedReferences: true });
+            const password = document.getElementById("password").value;
+            const passwordRepeat = document.getElementById("password_repeat").value;
+            // const username = DOMPurify.sanitize(document.getElementById("username").value.trim(), { ALLOWED_TAGS: [], ALLOWED_ATTR: [] });
+            // const email = DOMPurify.sanitize(document.getElementById("email").value.trim(), { ALLOWED_TAGS: [], ALLOWED_ATTR: [] });
+            //const password = DOMPurify.sanitize(document.getElementById("password").value);
+            //const passwordRepeat = DOMPurify.sanitize(document.getElementById("password_repeat").value);
+
+            errorMessage.textContent = "";
+            
+            if (!username || !email || !password || !passwordRepeat) {
+                errorMessage.textContent = "All fields must be filled";
+                return;
+            }
+
+            if (username.length < 3 || username.length > 40){
+                errorMessage.textContent = "Username must be between 3 and 40 characters";
+                return;
+            }
+
+            const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/; //owasp email regex
+            if (!emailRegex.test(email)) {
+                errorMessage.textContent = "Email address is invalid";
+                return;
+            }
+
+            const hasUpperCase = /[A-Z]/;
+            const hasLowerCase = /[a-z]/;
+            const hasDigit = /[0-9]/;
+            const hasSpecialChar = /[ !"#$%&'()*+,\-./:;<=>?@[\]\\^_`{|}~]/; //owasp list
+
+            var msg = "";
+            if (password.length < 12) {
+                msg += "Password must be at least 12 characters long\n";
+            }
+
+            if(!hasLowerCase.test(password)){
+                msg +="Password must contain a lowercase\n";
+            }
+            if(!hasUpperCase.test(password)){
+                msg +="Password must contain an uppercase\n";
+            }
+            if(!hasDigit.test(password)){
+                msg +="Password must contain a digit\n";
+            }
+            if(!hasSpecialChar.test(password)){
+                msg +="Password must contain a special character\n";
+            }
+            if(msg){
+                errorMessage.textContent = msg;
+                return;
+            }
+
+            if (password !== passwordRepeat) {
+                errorMessage.textContent = "Passwords do not match";
+                return;
+            }
+
+            this.submit();
+        });
+    </script>
 </body>
 </html>
 

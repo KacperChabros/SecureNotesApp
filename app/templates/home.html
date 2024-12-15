@@ -1,2 +1,6 @@
 <h1>welcome home {{username}}</h1>
 <a href="/logout">Logout</a>
+
+{% if totp_secret %}
+<h3>Your secret key for 2FA. Add it in Your authenticator app, You'll need it to log in to the account.<br>{{totp_secret}}</h3>
+{% endif %}
