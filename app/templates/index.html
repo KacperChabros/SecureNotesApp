@@ -8,13 +8,13 @@
 <body>
     <h2>Login page</h2>
     
-    <form action="/" method="POST">
+    <form id="loginForm" action="/" method="POST">
         <label for="username">Username:</label><br>
         <input type="text" id="username" name="username" required><br><br>
         
         <label for="password">Password:</label><br>
         <input type="password" id="password" name="password" required><br><br>
-        
+
         <label for="totp_code">TOTP code:</label><br>
         <input type="number" id="totp_code" name="totp_code" required><br><br>
 
@@ -25,5 +25,46 @@
     {% if error %}
     	<p style="color: red;">{{error}}</p>
     {% endif %}
+
+    {% if errors %}
+    <ul>
+    {% for field, error in errors.items() %}
+        <li><strong>{{ field.capitalize() }}:</strong> {{ error }}</li>
+        {% endfor %}
+        </ul>
+    {% endif %}
+
+    <p id="errorMessage" style="color: red;"></p>
+    <script>
+        document.getElementById("loginForm").addEventListener("submit", function (event) {
+            event.preventDefault();
+
+            const errorMessage = document.getElementById("errorMessage");
+            const username = document.getElementById("username").value.trim();
+            const password = document.getElementById("password").value;
+            const totp = document.getElementById("totp_code").value;
+
+
+            errorMessage.textContent = "";
+            
+            if (!username || !totp || !password) {
+                errorMessage.textContent = "All fields must be filled";
+                return;
+            }
+
+            if (username.length < 3 || username.length > 40){
+                errorMessage.textContent = "Username must be between 3 and 40 characters";
+                return;
+            }
+            
+            if (totp.length != 6){
+                errorMessage.textContent = "Invalid totp format";
+                return;
+            }
+
+            this.submit();
+        });
+    </script>
+
 </body>
 </html>

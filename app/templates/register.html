@@ -25,6 +25,7 @@
 
         <button type="submit">Register</button>
     </form>
+    <p>Password strength: <strong id="pass_strength"></strong></p>
 
     <p>Already a user? <a href="/login">Log in here</a></p>
 
@@ -42,6 +43,26 @@
     {% endif %}
 
     <script>
+        const hasUpperCase = /[A-Z]/;
+        const hasLowerCase = /[a-z]/;
+        const hasDigit = /[0-9]/;
+        const hasSpecialChar = /[ !"#$%&'()*+,\-./:;<=>?@[\]\\^_`{|}~]/; //owasp list
+
+        function calculateEntropy(password) {
+            let charSetSize = 0;
+
+            if (hasLowerCase.test(password)) charSetSize += 26;
+            if (hasUpperCase.test(password)) charSetSize += 26;
+            if (hasDigit.test(password)) charSetSize += 10;
+            if (hasSpecialChar.test(password)) charSetSize += 32;
+
+            const passwordLength = password.length;
+
+            return passwordLength > 0 && charSetSize > 0
+                ? (passwordLength * Math.log2(charSetSize)).toFixed(2)
+                : 0;
+        }
+
         document.getElementById("registerForm").addEventListener("submit", function (event) {
             event.preventDefault();
 
@@ -73,11 +94,6 @@
                 return;
             }
 
-            const hasUpperCase = /[A-Z]/;
-            const hasLowerCase = /[a-z]/;
-            const hasDigit = /[0-9]/;
-            const hasSpecialChar = /[ !"#$%&'()*+,\-./:;<=>?@[\]\\^_`{|}~]/; //owasp list
-
             var msg = "";
             if (password.length < 12) {
                 msg += "Password must be at least 12 characters long\n";
@@ -107,6 +123,24 @@
 
             this.submit();
         });
+
+        document.getElementById("password").addEventListener("keyup", () => {
+            const password = document.getElementById("password").value;
+            const pass_strength = document.getElementById("pass_strength");
+
+            const entropy = calculateEntropy(password);
+            var msg = '';
+            if (entropy < 35)
+                msg = 'Very weak';
+            else if (entropy < 59)
+                msg = 'Weak';
+            else if (entropy < 119)
+                msg = 'Strong';
+            else
+                msg = 'Very strong';
+                pass_strength.textContent = msg;
+        });
+
     </script>
 </body>
 </html>

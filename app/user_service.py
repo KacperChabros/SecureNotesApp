@@ -11,6 +11,9 @@ from Crypto.Random import get_random_bytes
 from Crypto.Util.Padding import pad, unpad
 import base64
 import pyotp
+from datetime import datetime, timezone, timedelta
+import math
+
 
 
 def get_user_by_username(username: str):
@@ -42,8 +45,9 @@ def validate_user_exists(username: str, email: str):
         return row is not None
     
 def validate_register_data(username: str, email: str, password: str, password_repeat: str):
-    '''Method for validating user data'''
+    '''Method for validating user data during registration'''
     errors = {}
+    charSetSize = 0
     if not username or not email or not password or not password_repeat:
         errors['general'] = 'Filling all fields is required'
     
@@ -59,12 +63,27 @@ def validate_register_data(username: str, email: str, password: str, password_re
         pass_error = 'Password must be at least 12 characters ; '
     if not re.search(r"[a-z]", password):
         pass_error += "Password must contain a lowercase ; "
+    else:
+        charSetSize += 26
+
     if not re.search(r"[A-Z]", password):
         pass_error +=  "Password must contain an uppercase ;"
+    else:
+        charSetSize += 26
+
     if not re.search(r"\d", password):
         pass_error +=  "Password must contain a digit ; "
+    else:
+        charSetSize += 10
+
     if not re.search(r'[ !"#$%&\'()*+,\-./:;<=>?@[\]\\^_`{|}~]', password):
         pass_error +=  "Password must contain a special character ;"
+    else:
+        charSetSize += 32
+
+    entropy = len(password) * math.log2(charSetSize)
+    if entropy < 59:
+        pass_error += "Password is too weak"
 
     if not pass_error:
         if password != password_repeat:
@@ -77,6 +96,22 @@ def validate_register_data(username: str, email: str, password: str, password_re
     
     return {'valid': True}
 
+def validate_login_data(username: str, password: str, totp_code: str):
+    '''Method to validate user input during login'''
+    errors = {} 
+    if not username or not password or not totp_code:
+        errors['general'] = 'Filling all fields is required'
+    
+    if len(username) < 3 or len(username) > 40:
+        errors['username'] = 'Username must be between 3 and 40 characters'
+
+    if len(totp_code) != 6:
+        errors['TOTP'] = 'Invalid TOTP code format'
+
+    if errors:
+        return {"valid": False, "errors": errors}
+    
+    return {'valid': True}
 
 def register_user(username: str, email: str, password: str):
     '''Method to register user'''
@@ -104,7 +139,8 @@ def register_user(username: str, email: str, password: str):
     encrypted_totp = cipher_totp.encrypt(padded_totp)
     encrypted_totp_secret = base64.b64encode(iv_totp + salt_totp + encrypted_totp).decode('utf-8')
 
-
+    del private_key
+    del keys
     with current_app.app_context():
         db = get_connection()
         cursor = db.cursor()      
@@ -126,6 +162,49 @@ def verify_password_and_totp(user, password: str, totp_code: str):
         padded_deciphered = cipher.decrypt(totp_ciphertext)
         retrieved_totp_secret = unpad(padded_deciphered, AES.block_size).decode('utf-8')
         totp = pyotp.TOTP(retrieved_totp_secret)
+        del retrieved_totp_secret
         if totp.verify(totp_code):
             return True
     return False
+
+def register_login_attempt(userId: int, ip_address: str, is_success: bool):
+    with current_app.app_context():
+        curr_time = datetime.now(timezone.utc)
+        db = get_connection()
+        cursor = db.cursor()
+        
+        cursor.execute("INSERT INTO loginAttempts(userId, time, ipAddress, isSuccess) VALUES(?,?,?,?)", (userId, curr_time, ip_address, is_success))
+        
+        db.commit()
+        
+        db.close()
+
+
+def get_failed_logins_since_last_successful(userId: int):
+    with current_app.app_context():
+        db = get_connection()
+        cursor = db.cursor()
+        
+        cursor.execute("""SELECT * FROM  loginAttempts WHERE userId = ? AND isSuccess = 0 AND time BETWEEN (SELECT time FROM loginAttempts WHERE userId = ? AND isSuccess = 1 ORDER BY time DESC LIMIT 1 OFFSET 1) 
+                       AND (SELECT time FROM loginAttempts WHERE userId = ? AND isSuccess = 1 ORDER BY time DESC LIMIT 1) ORDER BY time;""", (userId, userId, userId))
+        
+        rows = cursor.fetchall()
+        
+        db.close()
+
+        return rows
+    
+def is_locked_out(userId: int):
+    with current_app.app_context():
+        db = get_connection()
+        cursor = db.cursor()
+        
+        curr_time = datetime.now(timezone.utc)
+        time_threshold = curr_time - timedelta(minutes=15)
+        cursor.execute("SELECT COUNT(*) FROM  loginAttempts WHERE userId = ? AND isSuccess = 0 AND time >= ?", (userId, time_threshold))
+        
+        number_of_attempts = cursor.fetchone()
+        
+        db.close()
+
+        return number_of_attempts[0] >= 3
