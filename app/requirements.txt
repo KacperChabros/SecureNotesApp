@@ -6,3 +6,4 @@ pyotp
 bleach
 passlib
 pycryptodome
+markdown

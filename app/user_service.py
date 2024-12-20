@@ -36,8 +36,12 @@ def validate_user_exists(username: str, email: str):
         db = get_connection()
         cursor = db.cursor()
         
-        cursor.execute("SELECT * FROM users WHERE username=? OR email=?", (username, email))
-        
+        if username and email:
+            cursor.execute("SELECT * FROM users WHERE username=? OR email=?", (username, email))
+        elif username:
+            cursor.execute("SELECT * FROM users WHERE username=?", (username,))
+        elif email:
+             cursor.execute("SELECT * FROM users WHERE email=?", (email,))
         row = cursor.fetchone()
         
         db.close()
@@ -47,7 +51,7 @@ def validate_user_exists(username: str, email: str):
 def validate_register_data(username: str, email: str, password: str, password_repeat: str):
     '''Method for validating user data during registration'''
     errors = {}
-    charSetSize = 0
+    
     if not username or not email or not password or not password_repeat:
         errors['general'] = 'Filling all fields is required'
     
@@ -58,43 +62,48 @@ def validate_register_data(username: str, email: str, password: str, password_re
     if not re.fullmatch(email_pattern, email):
         errors['email'] = 'Email is invalid'
 
-    pass_error = ''
-    if len(password) < 12:
-        pass_error = 'Password must be at least 12 characters ; '
-    if not re.search(r"[a-z]", password):
-        pass_error += "Password must contain a lowercase ; "
-    else:
-        charSetSize += 26
-
-    if not re.search(r"[A-Z]", password):
-        pass_error +=  "Password must contain an uppercase ;"
-    else:
-        charSetSize += 26
-
-    if not re.search(r"\d", password):
-        pass_error +=  "Password must contain a digit ; "
-    else:
-        charSetSize += 10
-
-    if not re.search(r'[ !"#$%&\'()*+,\-./:;<=>?@[\]\\^_`{|}~]', password):
-        pass_error +=  "Password must contain a special character ;"
-    else:
-        charSetSize += 32
-
-    entropy = len(password) * math.log2(charSetSize)
-    if entropy < 59:
-        pass_error += "Password is too weak"
-
-    if not pass_error:
-        if password != password_repeat:
-            pass_error = 'Passwords do not match'
-    
+    pass_error = validate_password(password, password_repeat)
     if pass_error:
         errors['password'] = pass_error
     if errors:
         return {"valid": False, "errors": errors}
     
     return {'valid': True}
+
+def validate_password(password, password_repeat):
+    pass_error = ''
+    charSetSize = 0
+    if len(password) < 12:
+        pass_error = 'Password must be at least 12 characters | '
+    if not re.search(r"[a-z]", password):
+        pass_error += "Password must contain a lowercase | "
+    else:
+        charSetSize += 26
+
+    if not re.search(r"[A-Z]", password):
+        pass_error +=  "Password must contain an uppercase | "
+    else:
+        charSetSize += 26
+
+    if not re.search(r"\d", password):
+        pass_error +=  "Password must contain a digit | "
+    else:
+        charSetSize += 10
+
+    if not re.search(r'[ !"#$%&\'()*+,\-./:;<=>?@[\]\\^_`{|}~]', password):
+        pass_error +=  "Password must contain a special character | "
+    else:
+        charSetSize += 32
+
+    entropy = len(password) * math.log2(charSetSize)
+    if entropy < 59:
+        pass_error += "Password is too weak | "
+
+    if not pass_error:
+        if password != password_repeat:
+            pass_error = 'Passwords do not match'
+    return pass_error
+
 
 def validate_login_data(username: str, password: str, totp_code: str):
     '''Method to validate user input during login'''
@@ -139,6 +148,8 @@ def register_user(username: str, email: str, password: str):
     encrypted_totp = cipher_totp.encrypt(padded_totp)
     encrypted_totp_secret = base64.b64encode(iv_totp + salt_totp + encrypted_totp).decode('utf-8')
 
+    del padded_priv_key
+    del padded_totp
     del private_key
     del keys
     with current_app.app_context():

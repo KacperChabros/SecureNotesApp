@@ -1,11 +1,12 @@
 import os
-from flask import Flask, render_template, request, make_response, redirect, session
+from flask import Flask, render_template, request, make_response, redirect, session, flash
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from dotenv import load_dotenv
 from db import get_connection, init_db
 from user_service import get_user_by_username, validate_user_exists, validate_register_data, register_user, verify_password_and_totp, register_login_attempt, get_failed_logins_since_last_successful, is_locked_out, validate_login_data
-import sqlite3
-import bleach
+from note_service import get_notes_created_by_user, get_notes_shared_with_user, get_public_notes, validate_note_data, sign_and_add_note
+from mappers import get_login_attempts_dict, get_notes_dict_list
+import markdown
 
 app = Flask(__name__)
 load_dotenv()
@@ -124,11 +125,59 @@ def home():
         totp_secret = session.pop('totp_secret', None)
         username = current_user.id
         login_attempts = get_failed_logins_since_last_successful(current_user.userId)
-        login_attempts_result = result = [
-            {"time": row['time'], "ipAddress": row['ipAddress']}
-            for row in login_attempts
-        ]
-        return render_template("home.html", username = username, totp_secret=totp_secret, login_attempts=login_attempts_result)
+        # login_attempts_result  = [
+        #     {"time": row['time'], "ipAddress": row['ipAddress']}
+        #     for row in login_attempts
+        # ]
+        login_attempts_dict = get_login_attempts_dict(login_attempts)
+
+        user_notes = get_notes_created_by_user(current_user.userId)
+        user_notes_list = get_notes_dict_list(user_notes)
+        shared_notes = get_notes_shared_with_user(current_user.userId)
+        shared_notes_list = get_notes_dict_list(shared_notes)
+        public_notes = get_public_notes()
+        public_notes_list = get_notes_dict_list(public_notes)
+
+        return render_template("home.html", username = username, totp_secret=totp_secret, login_attempts=login_attempts_dict, user_notes_list=user_notes_list, shared_notes_list=shared_notes_list, public_notes_list=public_notes_list)
+
+@app.route("/rendered_note/<note_id>")
+@login_required
+def rendered_note(note_id):
+    if request.method == 'GET':
+        return render_template("rendered_note.html", rendered_note=f'Work in progress {note_id}')
+    
+@app.route("/add_note", methods=["POST"])
+@login_required
+def add_note():
+    if request.method == "GET":
+        return redirect("/home")
+    if request.method == "POST":
+        title = request.form.get("title").strip()
+        content = request.form.get("content").strip()
+        is_public = 1 if request.form.get("isPublic") == "on" else 0
+        shared_to_username = request.form.get("sharedToUsername").strip()
+        user_password = request.form.get("user_password").strip()
+        note_password = request.form.get("note_password").strip()
+        note_password_repeat = request.form.get("note_password_repeat").strip()
+        totp_code = request.form.get("totp_code").strip()
+
+        validation_result = validate_note_data(title, content, shared_to_username, note_password, note_password_repeat, totp_code)
+        if not validation_result["valid"]:
+            for error_key, error_msg in validation_result["errors"].items():
+                flash(f"{error_key}: {error_msg}", 'error')
+            return redirect("/home")  
+        
+        if not verify_password_and_totp(current_user, user_password, totp_code):
+            flash(f'Wrong credentials provided', "error")
+            return redirect("/home")  
+        
+        result = sign_and_add_note(current_user.userId, title, content, shared_to_username, is_public, user_password, note_password)
+        if not result:
+            flash(f'There was an error while adding the note', "error")
+            return redirect("/home") 
+
+        flash("Note added successfully!", "success")
+        return redirect("/home")  
 
 if __name__ == "__main__":
     app.run()

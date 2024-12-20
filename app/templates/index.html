@@ -45,20 +45,22 @@
             const totp = document.getElementById("totp_code").value;
 
 
-            errorMessage.textContent = "";
-            
+            var errorMsg = '';
             if (!username || !totp || !password) {
                 errorMessage.textContent = "All fields must be filled";
                 return;
             }
 
             if (username.length < 3 || username.length > 40){
-                errorMessage.textContent = "Username must be between 3 and 40 characters";
-                return;
+                errorMsg += "Username must be between 3 and 40 characters | ";
             }
             
             if (totp.length != 6){
-                errorMessage.textContent = "Invalid totp format";
+                errorMsg += "Invalid TOTP format";
+            }
+
+            if (errorMsg){
+                errorMessage.textContent = errorMsg;
                 return;
             }
 

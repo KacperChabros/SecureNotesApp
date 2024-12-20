@@ -28,8 +28,9 @@ def init_db():
             CREATE TABLE IF NOT EXISTS notes (
                 noteId INTEGER PRIMARY KEY AUTOINCREMENT,
                 userId INTEGER NOT NULL,
+                title TEXT NOT NULL,
                 content TEXT NOT NULL,
-                unencryptedContentHash TEXT NOT NULL,
+                notePasswordHash TEXT NULL,
                 sign TEXT NOT NULL,
                 isCiphered BOOLEAN NOT NULL,
                 isPublic BOOLEAN NOT NULL,

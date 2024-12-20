@@ -83,41 +83,45 @@
                 return;
             }
 
+            var errorMsg = "";
             if (username.length < 3 || username.length > 40){
-                errorMessage.textContent = "Username must be between 3 and 40 characters";
-                return;
+                errorMsg = "Username must be between 3 and 40 characters | ";
             }
 
             const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/; //owasp email regex
             if (!emailRegex.test(email)) {
-                errorMessage.textContent = "Email address is invalid";
-                return;
+                errorMsg += "Email address is invalid | ";
             }
 
-            var msg = "";
             if (password.length < 12) {
-                msg += "Password must be at least 12 characters long\n";
+                errorMsg += "Password must be at least 12 characters long | ";
             }
 
             if(!hasLowerCase.test(password)){
-                msg +="Password must contain a lowercase\n";
+                errorMsg +="Password must contain a lowercase | ";
             }
             if(!hasUpperCase.test(password)){
-                msg +="Password must contain an uppercase\n";
+                errorMsg +="Password must contain an uppercase | ";
             }
             if(!hasDigit.test(password)){
-                msg +="Password must contain a digit\n";
+                errorMsg +="Password must contain a digit | ";
             }
             if(!hasSpecialChar.test(password)){
-                msg +="Password must contain a special character\n";
+                errorMsg +="Password must contain a special character | ";
             }
-            if(msg){
-                errorMessage.textContent = msg;
-                return;
+
+            const entropy = calculateEntropy(password);
+            if (entropy < 59){
+                errorMsg += "Password is too weak | ";
             }
 
             if (password !== passwordRepeat) {
-                errorMessage.textContent = "Passwords do not match";
+                errorMsg += "Passwords do not match";
+            }
+
+
+            if(errorMsg){
+                errorMessage.textContent = errorMsg;
                 return;
             }
 

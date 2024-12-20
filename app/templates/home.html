@@ -1,21 +1,232 @@
-<h1>welcome home {{username}}</h1>
-<a href="/logout">Logout</a>
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home page</title>
+</head>
+<body>
+    <h1>welcome home {{username}}</h1>
+    <a href="/logout">Logout</a>
 
-{% if totp_secret %}
-<h3>Your secret key for 2FA. Add it in Your authenticator app, You'll need it to log in to the account.<br>{{totp_secret}}</h3>
-{% endif %}
+    {% if totp_secret %}
+    <h3>Your secret key for 2FA. Add it in Your authenticator app, You'll need it to log in to the account.<br>{{totp_secret}}</h3>
+    {% endif %}
 
-{% if login_attempts %}
-<div style="color: red;">
-    <p>Failed login attempts detected:</p>
-    <ul>
-        {% for attempt in login_attempts %}
-            <li><strong>Attempt on {{attempt['time']}} from {{ attempt['ipAddress'] }}</strong></li>
-        {% endfor %}
-    </ul>
-</div>
-{% else %}
-<div style="color: green;">
-    <p>No failed login attempts detected since the previous successful one.</p>
-</div>
-{% endif %}
+    {% if login_attempts %}
+    <div style="color: red;">
+        <p>Failed login attempts detected:</p>
+        <ul>
+            {% for attempt in login_attempts %}
+                <li><strong>Attempt on {{attempt['time']}} from {{ attempt['ipAddress'] }}</strong></li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% else %}
+    <div style="color: green;">
+        <p>No failed login attempts detected since the previous successful one.</p>
+    </div>
+    {% endif %}
+
+    <h2>Add New Note</h2>
+    <form action="/add_note" id="addNoteForm" method="post">
+        <label for="title">Title:</label>
+        <input type="text" id="title" name="title" required>
+        <br><br>
+
+        <label for="content">Content:</label>
+        <textarea id="content" name="content" rows="5" cols="30" required></textarea>
+        <br><br>
+
+        <label for="isPublic">
+            <input type="checkbox" id="isPublic" name="isPublic">
+            Make Public (doesn't matter when Shared to Username is filled)
+        </label>
+        <br><br>
+
+        <label for="sharedToUsername">Shared To Username (optional):</label>
+        <input type="text" id="sharedToUsername" name="sharedToUsername">
+        <br><br>
+
+        <label for="note_password">Note Encryption Password (optional):</label>
+        <input type="password" id="note_password" name="note_password">
+        <br><br>
+
+        <label for="note_password_repeat">Repeat Encryption Password (optional):</label>
+        <input type="password" id="note_password_repeat" name="note_password_repeat">
+        <br><br>
+
+        <label for="user_password">Enter Your password to sign the note:</label>
+        <input type="password" id="user_password" name="user_password" required>
+        <br><br>
+
+        <label for="totp_code">Enter Your TOTP:</label>
+        <input type="text" id="totp_code" name="totp_code" required>
+        <br><br>
+
+        <button type="submit">Add Note</button>
+    </form>
+    <p>Note Password strength: <strong id="pass_strength"></strong></p>
+    <p id="errorMessage" style="color: red;"></p>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <ul>
+            {% for category, message in messages %}
+                <li class="{{ category }}">{{ message }}</li>
+            {% endfor %}
+            </ul>
+        {% endif %}
+    {% endwith %}
+
+    <div style="display: flex; width: 100%; border: 1px solid black;">
+        <div style="flex: 1; border-right: 1px solid gray;">
+            <h3>Notes created by You</h3>
+            {% if user_notes_list %}
+            <ul>
+                {% for note in user_notes_list %}
+                    <li><a href="/rendered_note/{{note.id}}">Note with id {{note.id}} and title: {{note.title}}</a></li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+        </div>
+
+        <div style="flex: 1; border-right: 1px solid gray;">
+            <h3>Notes shared with You</h3>
+            {% if shared_notes_list %}      
+            <ul>
+                {% for note in shared_notes_list %}
+                    <li><a href="/rendered_note/{{note.id}}">Note with id {{note.id}} and title: {{note.title}}</a></li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+        </div>
+
+        <div style="flex: 1;">
+            <h3>Public notes</h3>
+            {% if public_notes_list %}
+            <ul>
+                {% for note in public_notes_list %}
+                    <li><a href="/rendered_note/{{note.id}}">Note with id {{note.id}} and title: {{note.title}}</a></li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+        </div>
+      </div>
+
+    <script>
+        const hasUpperCase = /[A-Z]/;
+        const hasLowerCase = /[a-z]/;
+        const hasDigit = /[0-9]/;
+        const hasSpecialChar = /[ !"#$%&'()*+,\-./:;<=>?@[\]\\^_`{|}~]/; //owasp list
+
+        function calculateEntropy(password) {
+            let charSetSize = 0;
+
+            if (hasLowerCase.test(password)) charSetSize += 26;
+            if (hasUpperCase.test(password)) charSetSize += 26;
+            if (hasDigit.test(password)) charSetSize += 10;
+            if (hasSpecialChar.test(password)) charSetSize += 32;
+
+            const passwordLength = password.length;
+
+            return passwordLength > 0 && charSetSize > 0
+                ? (passwordLength * Math.log2(charSetSize)).toFixed(2)
+                : 0;
+        }
+
+
+        document.getElementById("addNoteForm").addEventListener("submit", function (event) {
+            event.preventDefault();
+
+            const errorMessage = document.getElementById("errorMessage");
+            const title = document.getElementById("title").value.trim();
+            const content = document.getElementById("content").value.trim();
+            const sharedToUsername = document.getElementById("sharedToUsername").value.trim();
+            const note_password = document.getElementById("note_password").value;
+            const note_password_repeat = document.getElementById("note_password_repeat").value;
+            const user_password = document.getElementById("user_password").value;
+            const totp_code = document.getElementById("totp_code").value;
+
+
+            errorMessage.textContent = "";
+            
+            var errorMsg = '';
+            if (!title || !content) {
+                errorMsg += "Title and Content fields are required | ";
+            }
+
+            if (title.length < 4 || title.length > 50){
+                errorMsg += "Title must be between 4 and 50 characters | ";
+            }
+
+            if (content.length < 5 || title.length > 2000){
+                errorMsg += "Content must be between 5 and 2000 characters | ";
+            }
+
+            if (sharedToUsername && (sharedToUsername.length < 3 || sharedToUsername.length > 40)){
+                errorMsg += "If set, Username must be between 3 and 40 characters | ";
+            }
+            
+            if ((note_password && !note_password_repeat) || (!note_password && note_password_repeat)) {
+                errorMsg += "Both note password and note password repeat must be provided when one is | ";
+            }
+
+            if (note_password && note_password_repeat){
+                if (note_password && note_password.length < 12){
+                errorMsg += "If set, note password cannot be shorter than 12 characters | ";
+                }
+
+                if(note_password &&  !hasLowerCase.test(note_password)){
+                    errorMsg +="Note Password must contain a lowercase | ";
+                }
+                if(note_password && !hasUpperCase.test(note_password)){
+                    errorMsg +="Note Password must contain an uppercase | ";
+                }
+                if(note_password && !hasDigit.test(note_password)){
+                    errorMsg +="Note Password must contain a digit | ";
+                }
+                if(note_password && !hasSpecialChar.test(note_password)){
+                    errorMsg +="Note Password must contain a special character | ";
+                }
+                
+                const entropy = calculateEntropy(note_password);
+                if (entropy < 59){
+                    errorMsg += "Note Password is too weak | ";
+                }
+                
+                if (note_password !== note_password_repeat) {
+                    errorMsg += "Note Passwords do not match | ";
+                }
+            } 
+
+            if (totp_code.length != 6){
+                errorMsg += "Invalid TOTP format";
+            }
+
+            if (errorMsg){
+                errorMessage.textContent = errorMsg;
+                return;
+            }
+
+            this.submit();
+        });
+
+        document.getElementById("note_password").addEventListener("keyup", () => {
+            const password = document.getElementById("note_password").value;
+            const pass_strength = document.getElementById("pass_strength");
+
+            const entropy = calculateEntropy(password);
+            var msg = '';
+            if (entropy < 35)
+                msg = 'Very weak';
+            else if (entropy < 59)
+                msg = 'Weak';
+            else if (entropy < 119)
+                msg = 'Strong';
+            else
+                msg = 'Very strong';
+                pass_strength.textContent = msg;
+        });
+    </script>
+</body>
+</html>
