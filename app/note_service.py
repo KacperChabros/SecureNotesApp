@@ -1,12 +1,16 @@
 import sqlite3
 from flask import current_app
 from db import get_connection
-from user_service import validate_password, validate_user_exists
+from user_service import validate_password, validate_user_exists, get_userId_by_username
 import base64
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import AES
 from Crypto.Protocol.KDF import PBKDF2
 from Crypto.Util.Padding import pad, unpad
+from Crypto.Hash import SHA256
+from Crypto.Signature import pkcs1_15
+from Crypto.Random import get_random_bytes
+from passlib.hash import sha256_crypt
 
 def get_notes_created_by_user(userId: int):
     """Method for getting all user's notes"""
@@ -68,8 +72,8 @@ def validate_note_data(title: str, content: str, sharedToUsername: str, note_pas
 
     if sharedToUsername and (len(sharedToUsername) < 3 or len(sharedToUsername) > 40):
         errors['sharedToUsername'] = 'If set, Username must be between 3 and 40 characters.'
-    # elif sharedToUsername and not validate_user_exists(sharedToUsername, None):
-    #     errors['sharedToUsername'] = 'This user does not exist'
+    elif sharedToUsername and not validate_user_exists(sharedToUsername, None):
+        errors['sharedToUsername'] = 'This user does not exist'
 
 
     if(note_password is None and note_password_repeat is not None) or (note_password is not None and note_password_repeat is None):
@@ -88,21 +92,44 @@ def validate_note_data(title: str, content: str, sharedToUsername: str, note_pas
 
     return {"valid": True}
 
-def sign_and_add_note(curr_user_id: int, title: str, content: str, shared_to_username: str, is_public: bool, user_password: str, note_password: str):
+def sign_and_add_note(curr_user_id: int, title: str, content: str, shared_with_username: str, is_public: bool, user_password: str, note_password: str):
     '''Method to sign and add note'''
     with current_app.app_context():
         db = get_connection()
         cursor = db.cursor()
         cursor.execute("SELECT * FROM users WHERE id=?", (curr_user_id,))
         row = cursor.fetchone()
-
+        
         if row is None:
             return False
 
-        priv_key = decrypt_priv_key(row['privateKeyEncrypted'], user_password)
-        
+        priv_key_text = decrypt_priv_key(row['privateKeyEncrypted'], user_password)
+        signature = sign_message(priv_key_text, content)
+        del priv_key_text
+        del user_password
 
-        del priv_key
+        is_shared = False
+        is_ciphered = False
+        shared_with_user_id = None
+        note_password_hash = None
+        if shared_with_username:
+            shared_with_user_id = get_userId_by_username(shared_with_username)
+            if not shared_with_username:
+                return False
+            is_public = False
+            is_shared = True
+        
+        content_to_add = content
+        if note_password:
+            note_password_hash = sha256_crypt.hash(note_password, rounds=550000)
+            encrypted_note = encrypt_note(note_password, content)
+            is_ciphered = True
+            content_to_add = encrypted_note
+            del note_password
+        
+        
+        db.execute('INSERT INTO notes(userId, title, content, notePasswordHash, sign, isCiphered, isPublic, isShared, sharedToUserId) VALUES (?,?,?,?,?,?,?,?,?)', (curr_user_id, title, content_to_add, note_password_hash, signature, is_ciphered, is_public, is_shared, shared_with_user_id))
+        db.commit()
         db.close()
 
     return True
@@ -116,12 +143,76 @@ def decrypt_priv_key(encrypted_priv_key, user_password):
     cipher_d = AES.new(key_d, AES.MODE_CBC, iv_d)
     padded_decyphered = cipher_d.decrypt(ciphertext_d)
     retrieved_priv_key = unpad(padded_decyphered, AES.block_size).decode('utf-8')
-    del padded_decyphered
-    del key_d
+    del decoded_priv_key
     del iv_d
     del salt_d
     del ciphertext_d
-    del decoded_priv_key
-    del encrypted_priv_key
+    del key_d
     del cipher_d
+    del padded_decyphered
     return retrieved_priv_key
+
+def encrypt_note(note_password: str, content: str):
+    salt = get_random_bytes(16)
+    iv = get_random_bytes(16)
+    key = PBKDF2(note_password, salt, dkLen=32)
+    cipher = AES.new(key, AES.MODE_CBC, iv)
+    padded_note_content = pad(content.encode('utf-8'), AES.block_size)
+    encrypted_note_content = cipher.encrypt(padded_note_content)
+    encrypted_note_base64 = base64.b64encode(iv + salt + encrypted_note_content).decode('utf-8')
+    del salt
+    del iv
+    del key
+    del cipher
+    del padded_note_content
+    del encrypted_note_content
+    return encrypted_note_base64 
+
+def sign_message(priv_key_text: str, content: str):
+        rsa_keys = RSA.import_key(priv_key_text)
+        del priv_key_text
+        hash = SHA256.new(content.encode())
+        sig = pkcs1_15.new(rsa_keys).sign(hash)
+        del rsa_keys
+        signature_base64 = base64.b64encode(sig).decode('utf-8')
+        return signature_base64
+
+def fetch_note_if_user_can_view_it(noteId: int, userId: int):
+    with current_app.app_context():
+        db = get_connection()
+        cursor = db.cursor()
+        
+        cursor.execute("""SELECT notes.noteId, notes.title, notes.content, notes.notePasswordHash, notes.sign, notes.isCiphered, notes.isPublic, notes.isShared, users_owner.username AS owner_username, users_shared.username AS shared_to_username 
+                       FROM notes 
+                       JOIN users AS users_owner ON notes.userId = users_owner.id
+                       LEFT JOIN users AS users_shared ON notes.sharedToUserId = users_shared.id
+                       WHERE noteId=? AND (userId=? OR sharedToUserId=? OR isPublic=TRUE)""", (noteId, userId, userId))
+
+        row = cursor.fetchone()
+
+        db.close()
+
+        return row
+    
+def decrypt_note(note_password: str, note_password_hash: str, encrypted_note: str):
+    if not sha256_crypt.verify(note_password, note_password_hash):
+        return False
+    decoded_note = base64.b64decode(encrypted_note)
+    iv = decoded_note[:16]
+    salt = decoded_note[16:32]
+    note_ciphertext = decoded_note[32:]
+    key = PBKDF2(note_password, salt, dkLen=32)
+    cipher = AES.new(key, AES.MODE_CBC, iv)
+    padded_deciphered = cipher.decrypt(note_ciphertext)
+    decrypted_note = unpad(padded_deciphered, AES.block_size).decode('utf-8')
+    del decoded_note
+    del iv
+    del salt
+    del note_ciphertext
+    del key
+    del cipher
+    del padded_deciphered
+    
+    return decrypted_note
+    
+    

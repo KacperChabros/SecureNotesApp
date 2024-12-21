@@ -4,8 +4,8 @@ from flask_login import LoginManager, UserMixin, login_user, logout_user, login_
 from dotenv import load_dotenv
 from db import get_connection, init_db
 from user_service import get_user_by_username, validate_user_exists, validate_register_data, register_user, verify_password_and_totp, register_login_attempt, get_failed_logins_since_last_successful, is_locked_out, validate_login_data
-from note_service import get_notes_created_by_user, get_notes_shared_with_user, get_public_notes, validate_note_data, sign_and_add_note
-from mappers import get_login_attempts_dict, get_notes_dict_list
+from note_service import get_notes_created_by_user, get_notes_shared_with_user, get_public_notes, validate_note_data, sign_and_add_note, fetch_note_if_user_can_view_it, decrypt_note
+from mappers import get_login_attempts_dict, get_notes_dict_list, get_note_dict
 import markdown
 
 app = Flask(__name__)
@@ -125,10 +125,6 @@ def home():
         totp_secret = session.pop('totp_secret', None)
         username = current_user.id
         login_attempts = get_failed_logins_since_last_successful(current_user.userId)
-        # login_attempts_result  = [
-        #     {"time": row['time'], "ipAddress": row['ipAddress']}
-        #     for row in login_attempts
-        # ]
         login_attempts_dict = get_login_attempts_dict(login_attempts)
 
         user_notes = get_notes_created_by_user(current_user.userId)
@@ -140,11 +136,35 @@ def home():
 
         return render_template("home.html", username = username, totp_secret=totp_secret, login_attempts=login_attempts_dict, user_notes_list=user_notes_list, shared_notes_list=shared_notes_list, public_notes_list=public_notes_list)
 
-@app.route("/rendered_note/<note_id>")
+@app.route("/rendered_note/<note_id>", methods=["GET", "POST"])
 @login_required
 def rendered_note(note_id):
-    if request.method == 'GET':
-        return render_template("rendered_note.html", rendered_note=f'Work in progress {note_id}')
+    note = fetch_note_if_user_can_view_it(note_id, current_user.userId)
+    note_dict = get_note_dict(note)
+    if not note:
+        return "<h1>You are unauthorized to view this resource</h1>", 401
+    if not note['isCiphered']:
+        return render_template("rendered_note.html", note_dict=note_dict)
+    
+    if request.method == "GET":
+        return render_template("ciphered_note.html", note_id=note_id)
+    
+    if request.method == "POST":
+        note_password = request.form.get("note_password")
+        decrypted_content = decrypt_note(note_password, note['notePasswordHash'], note['content'])
+        if not decrypted_content:
+            return render_template("ciphered_note.html", note_id=note_id, error="Wrong credentials provided")
+        note_dict['content'] = decrypted_content
+        return render_template("rendered_note.html", note_dict=note_dict)
+        # Weryfikujemy hasło do notatki
+        # if check_password_hash(note["notePasswordHash"], input_password):
+        #     decrypted_content = decrypt_note_content(note["content"], input_password)
+        #     return render_template("rendered_note.html", rendered_note=decrypted_content)
+        # else:
+        #     flash("Invalid password for this note", "danger")
+        #     return redirect(url_for("rendered_note", note_id=note_id))
+        
+
     
 @app.route("/add_note", methods=["POST"])
 @login_required

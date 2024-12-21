@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rendered note</title>
+</head>
+<body>
+    <h1>This note is encrypted</h1>
+    <form method="POST" action="{{ url_for('rendered_note', note_id=note_id) }}">
+        <label for="note_password">Enter Password:</label>
+        <input type="password" id="note_password" name="note_password" required>
+        <button type="submit">Submit</button>
+    </form>
+
+    {% if error %}
+        <p style="color: red;">{{error}}</p>
+    {% endif %}
+
+    <a href="/home">Go back to home page</a>
+
+</body>
+</html>

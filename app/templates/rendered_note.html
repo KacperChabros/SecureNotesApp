@@ -7,8 +7,22 @@
 </head>
 <body>
     <h2>Rendered Note</h2>
-    
-    {{ rendered_note }}
+    {% if note_dict %}
+        <h2>Title: {{note_dict['title']}}</h2>
+        
+        <p>Created by: {{note_dict['owner_username']}}</p>
+        {% if note_dict['shared_to_username'] %}
+        <p>Shared with: {{note_dict['shared_to_username']}}</p>
+        {% endif %}
+
+        <p>Is Public Note? {{note_dict['isPublic']}}</p>
+        <p>Is Ciphered Note? {{note_dict['isCiphered']}}</p>
+        
+        <div>
+            Content:<br>
+            {{note_dict['content']}}
+        </div>
+    {% endif %}
 
     <a href="/home">Go back to home page</a>
 

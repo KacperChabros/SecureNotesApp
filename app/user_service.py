@@ -29,6 +29,22 @@ def get_user_by_username(username: str):
         db.close()
 
         return row
+    
+def get_userId_by_username(username: str):
+    '''Method for getting just user id based on the username'''
+    with current_app.app_context():
+        db = get_connection()
+        cursor = db.cursor()
+        
+        cursor.execute("SELECT id FROM users WHERE username=?", (username,))
+        
+        row = cursor.fetchone()
+        
+        db.close()
+
+        if row:
+            return row['id']
+        return None
 
 def validate_user_exists(username: str, email: str):
     '''Method for validating the existance of a user based on username or email'''
