@@ -1,7 +1,7 @@
 import sqlite3
 from flask import current_app
 from db import get_connection
-from user_service import validate_password, validate_user_exists, get_userId_by_username
+from user_service import validate_password, validate_user_exists, get_userId_by_username, get_user_public_key
 import base64
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import AES
@@ -169,20 +169,20 @@ def encrypt_note(note_password: str, content: str):
     return encrypted_note_base64 
 
 def sign_message(priv_key_text: str, content: str):
-        rsa_keys = RSA.import_key(priv_key_text)
-        del priv_key_text
-        hash = SHA256.new(content.encode())
-        sig = pkcs1_15.new(rsa_keys).sign(hash)
-        del rsa_keys
-        signature_base64 = base64.b64encode(sig).decode('utf-8')
-        return signature_base64
+    rsa_keys = RSA.import_key(priv_key_text)
+    hash = SHA256.new(content.encode())
+    sig = pkcs1_15.new(rsa_keys).sign(hash)
+    del priv_key_text
+    del rsa_keys
+    signature_base64 = base64.b64encode(sig).decode('utf-8')
+    return signature_base64
 
 def fetch_note_if_user_can_view_it(noteId: int, userId: int):
     with current_app.app_context():
         db = get_connection()
         cursor = db.cursor()
         
-        cursor.execute("""SELECT notes.noteId, notes.title, notes.content, notes.notePasswordHash, notes.sign, notes.isCiphered, notes.isPublic, notes.isShared, users_owner.username AS owner_username, users_shared.username AS shared_to_username 
+        cursor.execute("""SELECT notes.noteId, notes.userId, notes.title, notes.content, notes.notePasswordHash, notes.sign, notes.isCiphered, notes.isPublic, notes.isShared, users_owner.username AS owner_username, users_shared.username AS shared_to_username 
                        FROM notes 
                        JOIN users AS users_owner ON notes.userId = users_owner.id
                        LEFT JOIN users AS users_shared ON notes.sharedToUserId = users_shared.id
@@ -215,4 +215,16 @@ def decrypt_note(note_password: str, note_password_hash: str, encrypted_note: st
     
     return decrypted_note
     
-    
+def verify_note_authorship(user_owner_id: int, sign: str, content: str):
+    '''Method to verify if note hasn't be altered'''
+    decoded_sign = base64.b64decode(sign)
+    public_key_text = get_user_public_key(user_owner_id)
+    if not public_key_text:
+        return False
+    hash = SHA256.new(content.encode())
+    public_key = RSA.import_key(public_key_text)
+    try:
+        pkcs1_15.new(public_key).verify(hash, decoded_sign)
+        return True 
+    except:
+        return False

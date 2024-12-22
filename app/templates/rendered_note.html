@@ -18,9 +18,15 @@
         <p>Is Public Note? {{note_dict['isPublic']}}</p>
         <p>Is Ciphered Note? {{note_dict['isCiphered']}}</p>
         
+        {% if note_dict['is_valid'] %}
+            <p style="color: green;">The note hasn't been tampered with</p>
+        {% else %}
+            <p style="color: red;">WARNING: Couldn't confirm that the note hasn't been tampered with and/or authorship of the note</p>
+        {% endif %}
+        
         <div>
             Content:<br>
-            {{note_dict['content']}}
+            {{note_dict['content']|safe}}
         </div>
     {% endif %}
 
