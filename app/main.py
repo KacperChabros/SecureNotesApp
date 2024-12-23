@@ -4,7 +4,7 @@ from flask_login import LoginManager, UserMixin, login_user, logout_user, login_
 from dotenv import load_dotenv
 from db import get_connection, init_db
 from user_service import get_user_by_username, validate_user_exists, validate_register_data, register_user, verify_password_and_totp, register_login_attempt, get_failed_logins_since_last_successful, is_locked_out, validate_login_data
-from note_service import get_notes_created_by_user, get_notes_shared_with_user, get_public_notes, validate_note_data, sign_and_add_note, fetch_note_if_user_can_view_it, decrypt_note, verify_note_authorship
+from note_service import get_notes_created_by_user, get_notes_shared_with_user, get_public_notes, validate_note_data, sign_and_add_note, fetch_note_if_user_can_view_it, decrypt_note, verify_note_authorship, clean_displayed_content
 from mappers import get_login_attempts_dict, get_notes_dict_list, get_note_dict
 import markdown
 
@@ -123,7 +123,7 @@ def logout():
 def home():
     if request.method == 'GET':
         totp_secret = session.pop('totp_secret', None)
-        username = current_user.id
+        username = clean_displayed_content(current_user.id)
         login_attempts = get_failed_logins_since_last_successful(current_user.userId)
         login_attempts_dict = get_login_attempts_dict(login_attempts)
 
@@ -146,7 +146,8 @@ def rendered_note(note_id):
     if not note['isCiphered']:
         is_valid_note = verify_note_authorship(note['userId'], note['sign'], note['content'])
         note_dict['is_valid'] = is_valid_note
-        note_dict['content'] = markdown.markdown(note_dict['content'])
+        note_dict['content'] = clean_displayed_content(markdown.markdown(note_dict['content']))
+        print(note_dict['content'])
         return render_template("rendered_note.html", note_dict=note_dict)
     
     if request.method == "GET":
@@ -160,7 +161,7 @@ def rendered_note(note_id):
         note_dict['content'] = decrypted_content
         is_valid_note = verify_note_authorship(note['userId'], note['sign'], note_dict['content'])
         note_dict['is_valid'] = is_valid_note
-        note_dict['content'] = markdown.markdown(note_dict['content'])
+        note_dict['content'] = clean_displayed_content(markdown.markdown(note_dict['content']))
         return render_template("rendered_note.html", note_dict=note_dict)
         
 

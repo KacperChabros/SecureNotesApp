@@ -11,6 +11,7 @@ from Crypto.Hash import SHA256
 from Crypto.Signature import pkcs1_15
 from Crypto.Random import get_random_bytes
 from passlib.hash import sha256_crypt
+from bleach import clean
 
 def get_notes_created_by_user(userId: int):
     """Method for getting all user's notes"""
@@ -67,8 +68,8 @@ def validate_note_data(title: str, content: str, sharedToUsername: str, note_pas
     if len(title) < 4 or len(title) > 50:
         errors['title'] = 'Title must be between 4 and 50 characters.'
 
-    if len(content) < 5 or len(content) > 2000:
-        errors['content'] = 'Content must be between 5 and 2000 characters.'
+    if len(content) < 5 or len(content) > 2500:
+        errors['content'] = 'Content must be between 5 and 2500 characters.'
 
     if sharedToUsername and (len(sharedToUsername) < 3 or len(sharedToUsername) > 40):
         errors['sharedToUsername'] = 'If set, Username must be between 3 and 40 characters.'
@@ -228,3 +229,18 @@ def verify_note_authorship(user_owner_id: int, sign: str, content: str):
         return True 
     except:
         return False
+
+def clean_displayed_content(html_to_clean: str):
+    '''Method to bleach html content'''
+    if not html_to_clean:
+        return None
+    allowed_tags = [
+        'b', 'strong', 'i', 'em', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'a', 'img', 'ul', 'ol', 'li', 'p', 'br', 'hr', 'blockquote', 'code', 'pre'
+    ]
+
+    allowed_attributes = {
+        'a': ['href', 'title'],
+        'img': ['src', 'alt', 'title'], 
+    }
+
+    return clean(html_to_clean, tags=allowed_tags, attributes=allowed_attributes)
