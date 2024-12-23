@@ -3,7 +3,7 @@ from flask import Flask, render_template, request, make_response, redirect, sess
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from dotenv import load_dotenv
 from db import get_connection, init_db
-from user_service import get_user_by_username, validate_user_exists, validate_register_data, register_user, verify_password_and_totp, register_login_attempt, get_failed_logins_since_last_successful, is_locked_out, validate_login_data
+from user_service import get_user_by_username, validate_user_exists, validate_register_data, register_user, verify_password_and_totp, register_login_attempt, get_failed_logins_since_last_successful, is_locked_out, validate_login_data, get_user_by_username_and_email, validate_forgot_password_data, generate_reset_password_token, validate_password, validate_token, change_password
 from note_service import get_notes_created_by_user, get_notes_shared_with_user, get_public_notes, validate_note_data, sign_and_add_note, fetch_note_if_user_can_view_it, decrypt_note, verify_note_authorship, clean_displayed_content
 from mappers import get_login_attempts_dict, get_notes_dict_list, get_note_dict
 import markdown
@@ -199,5 +199,37 @@ def add_note():
         flash("Note added successfully!", "success")
         return redirect("/home")  
 
+@app.route("/forgot_password", methods=["GET", "POST"])
+def forgot_password():
+    if request.method == "GET":
+        return render_template("forgot_password.html")
+    if request.method == "POST":
+        username = request.form.get('username')
+        email = request.form.get('email')
+        validation_result = validate_forgot_password_data(username, email)
+        if not validation_result["valid"]:
+            return render_template("forgot_password.html", errors=validation_result['errors']), 401
+        user = get_user_by_username_and_email(username, email)
+        if not user:
+            return render_template("forgot_password.html", message = "Reset password email was sent to the provided email if user with given username and email exists")
+        generate_reset_password_token(user['id'], email)
+        return render_template("forgot_password.html", message = "Reset password email was sent to the provided email if user with given username and email exists")
+
+@app.route("/reset_password/<token>", methods=["GET", "POST"])
+def reset_password(token):  
+    if request.method == "GET":
+        return render_template("reset_password.html", token=token)
+    if request.method == "POST":
+        password = request.form.get("password").strip()
+        password_repeat = request.form.get("password_repeat").strip()
+
+        pass_val_error = validate_password(password, password_repeat)
+        if pass_val_error:
+            return render_template("reset_password.html", error=pass_val_error, token=token)
+        validation_result = validate_token(token)
+        if not validation_result['valid']:
+            return render_template("reset_password.html", error=validation_result['error'], token=token)
+        totp_secret = change_password(validation_result['userId'], password)
+        return render_template("reset_password.html", success=True, totp_secret=totp_secret, token=token)
 if __name__ == "__main__":
     app.run()

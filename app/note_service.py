@@ -23,8 +23,6 @@ def get_notes_created_by_user(userId: int):
 
         rows = cursor.fetchall()
 
-        # db.execute('INSERT INTO notes(userId, title, content, unencryptedContentHash, sign, isCiphered, isPublic, isShared, sharedToUserId) VALUES (?,?,?,?,?,?,?,?,?)', (userId, 'Tytul', 'moja pierwsza wiad', 'hasz', 'podpisalem', 0, 1, 0, None))
-        # db.commit()
         db.close()
 
         return rows
@@ -173,7 +171,6 @@ def sign_message(priv_key_text: str, content: str):
     rsa_keys = RSA.import_key(priv_key_text)
     hash = SHA256.new(content.encode())
     sig = pkcs1_15.new(rsa_keys).sign(hash)
-    del priv_key_text
     del rsa_keys
     signature_base64 = base64.b64encode(sig).decode('utf-8')
     return signature_base64
@@ -244,3 +241,24 @@ def clean_displayed_content(html_to_clean: str):
     }
 
     return clean(html_to_clean, tags=allowed_tags, attributes=allowed_attributes)
+
+def get_not_encrypted_user_notes(userId: int):
+    with current_app.app_context():
+        db = get_connection()
+        cursor = db.cursor()
+        
+        cursor.execute("SELECT * FROM notes WHERE userId=? and isCiphered=FALSE", (userId,))
+
+        rows = cursor.fetchall()
+
+        db.close()
+
+        return rows
+    
+def update_signature(noteId: int, signature: str):
+    with current_app.app_context():
+        db = get_connection()
+        cursor = db.cursor()
+        cursor.execute("UPDATE notes SET sign=? WHERE noteId=?", (signature, noteId))
+        db.commit()
+        db.close()

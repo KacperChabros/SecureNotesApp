@@ -50,6 +50,17 @@ def init_db():
                 FOREIGN KEY (userId) REFERENCES users(id)
             );
         ''')
+        db.cursor().execute('''
+            CREATE TABLE IF NOT EXISTS resetPasswordTokens (
+                tokenId INTEGER PRIMARY KEY AUTOINCREMENT,
+                userId INTEGER NOT NULL,
+                createdAt DATETIME NOT NULL,
+                expiresAt DATETIME NOT NULL,
+                tokenHash TEXT NOT NULL,
+                isUsed BOOLEAN NOT NULL DEFAULT FALSE,
+                FOREIGN KEY (userId) REFERENCES users(id)
+            );
+        ''')
 
         db.commit()
         db.close()
