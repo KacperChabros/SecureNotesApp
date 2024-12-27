@@ -4,30 +4,25 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rendered note</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles/styles.css') }}">
 </head>
 <body>
     <h1>This note is encrypted</h1>
     <form method="POST" action="{{ url_for('rendered_note', note_id=note_id) }}">
         <input type="hidden" name="csrf_token" id="csrf_token">
-        <input style="display: none;" type="text" id="hp_field" name="hp_field">
-        
+        <input type="text" id="hp_field" name="hp_field">
+
         <label for="note_password">Enter Password:</label>
         <input type="password" id="note_password" name="note_password" required>
         <button type="submit">Submit</button>
     </form>
 
     {% if error %}
-        <p style="color: red;">{{error}}</p>
+        <p class="error">{{error}}</p>
     {% endif %}
 
     <a href="/home">Go back to home page</a>
 
-    <script>
-        fetch('/get_csrf_token')
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById('csrf_token').value = data.csrf_token;
-            });
-    </script>
+    <script src="{{ url_for('static', filename='scripts/add_csrf_token.js') }}"></script>
 </body>
 </html>

@@ -66,11 +66,24 @@ def validate_csrf():
         csrf_token = session.get('_csrf_token', None)
         form_token = request.form.get('csrf_token')
         if not csrf_token or csrf_token != form_token:
-            return "<h1>You are forbidden to perform this action</h1>", 403
+            return "<h1>You are forbidden to perform this action CSRF</h1>", 403
     
     honeypot = request.form.get('hp_field')
     if honeypot:
-        return "<h1>You are forbidden to perform this action</h1>", 403
+        return "<h1>You are forbidden to perform this action BOT</h1>", 403
+
+@app.after_request
+def add_csp_header(response):
+    csp_policy = (
+        "default-src 'self'; "
+        "script-src 'self'; "
+        "style-src 'self'; "
+        "img-src 'self' https:; "
+        "frame-ancestors 'none'; "
+        "object-src 'none'; "
+    )
+    response.headers['Content-Security-Policy'] = csp_policy
+    return response
 
 @app.route("/", methods=["GET","POST"])
 def login():

@@ -4,13 +4,23 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login page</title>
+    <!-- <style nonce="{{ nonce }}">
+        #hp_field {
+            display: none;
+        }
+
+        .error {
+            color: red;
+        }
+    </style> -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles/styles.css') }}">
 </head>
 <body>
     <h2>Login page</h2>
     
     <form id="loginForm" action="/" method="POST">
         <input type="hidden" name="csrf_token" id="csrf_token">
-        <input style="display: none;" type="text" id="hp_field" name="hp_field">
+        <input type="text" id="hp_field" name="hp_field">
         
         <label for="username">Username:</label><br>
         <input type="text" id="username" name="username" required><br><br>
@@ -27,57 +37,21 @@
     <p>Don't have an account? <a href="/register">Register here</a></p>
     <p>Forgot the password? <a href="/forgot_password">Reset it here</a></p>
     {% if error %}
-    	<p style="color: red;">{{error}}</p>
+    	<p class="error">{{error}}</p>
     {% endif %}
 
     {% if errors %}
-    <ul>
-    {% for field, error in errors.items() %}
-        <li><strong>{{ field.capitalize() }}:</strong> {{ error }}</li>
-        {% endfor %}
+        <ul class="error">
+            {% for field, error in errors.items() %}
+                <li><strong>{{ field.capitalize() }}:</strong> {{ error }}</li>
+            {% endfor %}
         </ul>
     {% endif %}
 
-    <p id="errorMessage" style="color: red;"></p>
-    <script>
-        fetch('/get_csrf_token')
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById('csrf_token').value = data.csrf_token;
-            });
-    </script>
-    <script>
-        document.getElementById("loginForm").addEventListener("submit", function (event) {
-            event.preventDefault();
+    <p id="errorMessage" class="error"></p>
 
-            const errorMessage = document.getElementById("errorMessage");
-            const username = document.getElementById("username").value.trim();
-            const password = document.getElementById("password").value;
-            const totp = document.getElementById("totp_code").value;
-
-
-            var errorMsg = '';
-            if (!username || !totp || !password) {
-                errorMessage.textContent = "All fields must be filled";
-                return;
-            }
-
-            if (username.length < 3 || username.length > 40){
-                errorMsg += "Username must be between 3 and 40 characters | ";
-            }
-            
-            if (totp.length != 6){
-                errorMsg += "Invalid TOTP format";
-            }
-
-            if (errorMsg){
-                errorMessage.textContent = errorMsg;
-                return;
-            }
-
-            this.submit();
-        });
-    </script>
+    <script src="{{ url_for('static', filename='scripts/add_csrf_token.js') }}"></script>
+    <script src="{{ url_for('static', filename='scripts/validate_login_form.js') }}"></script>
 
 </body>
 </html>

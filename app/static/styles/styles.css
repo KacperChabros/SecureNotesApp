@@ -1,0 +1,26 @@
+#hp_field {
+    display: none;
+}
+
+.error {
+    color: red;
+}
+
+.success {
+    color: green;
+}
+
+.table_container {
+    display: flex; 
+    width: 100%; 
+    border: 1px solid black;
+}
+
+.table_column {
+    flex: 1; 
+    border-right: 1px solid gray;
+}
+
+.table_last_column {
+    flex: 1;
+}

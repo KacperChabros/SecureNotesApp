@@ -313,7 +313,9 @@ def generate_reset_password_token(userId: int, email: str):
         expires_at = created_at + timedelta(minutes=5)
         reset_link = url_for('reset_password', token=token, _external=True)
         save_token_to_db(userId, created_at, expires_at, token_hash)
+        print("------------------------------------------------")
         print(f"Reset password link for {email}: {reset_link}")
+        print("------------------------------------------------")
 
 def save_token_to_db(userId, created_at, expires_at, token_hash):
     with current_app.app_context():
