@@ -8,6 +8,7 @@ import note_service
 from mappers import get_login_attempts_dict, get_notes_dict_list, get_note_dict
 import markdown
 import secrets
+import time
 
 app = Flask(__name__)
 load_dotenv()
@@ -90,6 +91,7 @@ def login():
     if request.method == "GET":
         return render_template("index.html")
     if request.method == "POST":
+        time.sleep(0.4)
         is_success = False
         ip_address = request.remote_addr
         username = request.form.get("username").strip()
@@ -102,13 +104,19 @@ def login():
         
         user = user_loader(username)  
         if user is None:
+            time.sleep(0.230)
             return render_template("index.html", error='Wrong username and/or password provided'), 401
         
         if user_service.is_locked_out(user.userId):
+            time.sleep(0.230)
             return render_template("index.html", error='Your account has been locked out due to too many failed login attempts. Try again in 15 minutes'), 401
 
+        start_time = time.time()
         if not user_service.verify_password_and_totp(user, password, totp_code):
+            elapsed_time = time.time() - start_time
             user_service.register_login_attempt(user.userId, ip_address, is_success)
+            if elapsed_time < 0.3:
+                time.sleep(0.3 - elapsed_time)
             return render_template("index.html", error='Wrong username and/or password provided'), 401
         
         login_user(user)
@@ -121,6 +129,7 @@ def register():
     if request.method == "GET":
         return render_template("register.html")
     if request.method == "POST":
+        time.sleep(0.3)
         username = request.form.get("username").strip()
         password = request.form.get("password").strip()
         password_repeat = request.form.get("password_repeat").strip()
@@ -130,8 +139,10 @@ def register():
         if not validation_result["valid"]:
             return render_template("register.html", errors=validation_result['errors']), 401
 
+
         doesExist = user_service.validate_user_exists(username, email)
         if doesExist:
+            time.sleep(0.540)
             return render_template("register.html", error='User with this username or email already exists'), 401
         
         totp_secret = user_service.register_user(username, email, password)
@@ -185,16 +196,20 @@ def rendered_note(note_id):
         return render_template("ciphered_note.html", note_id=note_id)
     
     if request.method == "POST":
+        time.sleep(0.4)
         note_password = request.form.get("note_password")
+        start_time = time.time()
         decrypted_content = note_service.decrypt_note(note_password, note['notePasswordHash'], note['content'])
+        elapsed_time = time.time() - start_time
+        if elapsed_time < 0.3:
+                time.sleep(0.3 - elapsed_time)
         if not decrypted_content:
             return render_template("ciphered_note.html", note_id=note_id, error="Wrong credentials provided")
         note_dict['content'] = decrypted_content
         is_valid_note = note_service.verify_note_authorship(note['userId'], note['sign'], note_dict['content'])
         note_dict['is_valid'] = is_valid_note
         note_dict['content'] = note_service.clean_displayed_content(markdown.markdown(note_dict['content']))
-        return render_template("rendered_note.html", note_dict=note_dict)
-        
+        return render_template("rendered_note.html", note_dict=note_dict)    
 
     
 @app.route("/add_note", methods=["POST"])
@@ -203,6 +218,7 @@ def add_note():
     if request.method == "GET":
         return redirect("/home")
     if request.method == "POST":
+        time.sleep(0.4)
         title = request.form.get("title").strip()
         content = request.form.get("content").strip()
         is_public = 1 if request.form.get("isPublic") == "on" else 0
@@ -218,7 +234,12 @@ def add_note():
                 flash(f"{error_key}: {error_msg}", 'error')
             return redirect("/home")  
         
+        start_time = time.time()
         if not user_service.verify_password_and_totp(current_user, user_password, totp_code):
+            elapsed_time = time.time() - start_time
+            if elapsed_time < 0.3:
+                time.sleep(0.3 - elapsed_time)
+            time.sleep(0.25)
             flash(f'Wrong credentials provided', "error")
             return redirect("/home")  
         
@@ -235,6 +256,7 @@ def forgot_password():
     if request.method == "GET":
         return render_template("forgot_password.html")
     if request.method == "POST":
+        time.sleep(0.5)
         username = request.form.get('username')
         email = request.form.get('email')
         validation_result = user_service.validate_forgot_password_data(username, email)
@@ -251,14 +273,17 @@ def reset_password(token):
     if request.method == "GET":
         return render_template("reset_password.html", token=token)
     if request.method == "POST":
+        time.sleep(0.3)
         password = request.form.get("password").strip()
         password_repeat = request.form.get("password_repeat").strip()
 
         pass_val_error = user_service.validate_password(password, password_repeat)
         if pass_val_error:
+            time.sleep(0.85)
             return render_template("reset_password.html", error=pass_val_error, token=token)
         validation_result = user_service.validate_token(token)
         if not validation_result['valid']:
+            time.sleep(0.81)
             return render_template("reset_password.html", error=validation_result['error'], token=token)
         totp_secret = user_service.change_password(validation_result['userId'], password)
         return render_template("reset_password.html", success=True, totp_secret=totp_secret, token=token)

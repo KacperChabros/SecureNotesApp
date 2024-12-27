@@ -15,6 +15,7 @@ import pyotp
 from datetime import datetime, timezone, timedelta
 import math
 import secrets
+import time
 
 
 
@@ -261,6 +262,8 @@ def verify_password_and_totp(user, password: str, totp_code: str):
         del retrieved_totp_secret
         if totp.verify(totp_code):
             return True
+    else:
+        time.sleep(0.04)
     return False
 
 def register_login_attempt(userId: int, ip_address: str, is_success: bool):
@@ -303,7 +306,7 @@ def is_locked_out(userId: int):
         
         db.close()
 
-        return number_of_attempts[0] >= 3
+        return number_of_attempts[0] >= 5
 
 def generate_reset_password_token(userId: int, email: str):
     with current_app.app_context():
@@ -334,13 +337,21 @@ def get_token_from_db(token_hash):
         row = cursor.fetchone()       
         db.close()
         return row
+    
+def expire_token(token_id):
+    with current_app.app_context():
+        db = get_connection()
+        cursor = db.cursor()      
+        cursor.execute("UPDATE resetPasswordTokens SET isUsed=TRUE WHERE tokenId=?", (token_id,))
+        db.commit()
+        db.close()
 
 def validate_token(token: str):
     token_hash = SHA256.new(token.encode()).hexdigest()
     token_row = get_token_from_db(token_hash)
     if not token_row:
         return {"valid": False, "error": 'Invalid token'}
-    
+    expire_token(token_row['tokenId'])
     return {'valid': True, "userId": token_row['userId']}
 
 def change_password(userId: int, password: str):

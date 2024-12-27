@@ -12,6 +12,7 @@ from Crypto.Signature import pkcs1_15
 from Crypto.Random import get_random_bytes
 from passlib.hash import sha256_crypt
 from bleach import clean
+import time
 
 def get_notes_created_by_user(userId: int):
     """Method for getting all user's notes"""
@@ -125,6 +126,8 @@ def sign_and_add_note(curr_user_id: int, title: str, content: str, shared_with_u
             is_ciphered = True
             content_to_add = encrypted_note
             del note_password
+        else:
+            time.sleep(0.25)
         
         
         db.execute('INSERT INTO notes(userId, title, content, notePasswordHash, sign, isCiphered, isPublic, isShared, sharedToUserId) VALUES (?,?,?,?,?,?,?,?,?)', (curr_user_id, title, content_to_add, note_password_hash, signature, is_ciphered, is_public, is_shared, shared_with_user_id))
