@@ -1,4 +1,3 @@
-import sqlite3
 from flask import current_app
 from db import get_connection
 from user_service import validate_password, validate_user_exists, get_userId_by_username, get_user_public_key

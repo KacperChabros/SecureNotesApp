@@ -26,15 +26,6 @@ document.getElementById("registerForm").addEventListener("submit", function (eve
     const email = document.getElementById("email").value.trim();
     const password = document.getElementById("password").value;
     const passwordRepeat = document.getElementById("password_repeat").value;
-    // const errorMessage = document.getElementById("errorMessage");
-    // const username = he.encode(document.getElementById("username").value.trim(), { useNamedReferences: true });
-    // const email = he.encode(document.getElementById("email").value.trim(),{ useNamedReferences: true });
-    // const password = document.getElementById("password").value;
-    // const passwordRepeat = document.getElementById("password_repeat").value;
-    // const username = DOMPurify.sanitize(document.getElementById("username").value.trim(), { ALLOWED_TAGS: [], ALLOWED_ATTR: [] });
-    // const email = DOMPurify.sanitize(document.getElementById("email").value.trim(), { ALLOWED_TAGS: [], ALLOWED_ATTR: [] });
-    //const password = DOMPurify.sanitize(document.getElementById("password").value);
-    //const passwordRepeat = DOMPurify.sanitize(document.getElementById("password_repeat").value);
 
     errorMessage.textContent = "";
     

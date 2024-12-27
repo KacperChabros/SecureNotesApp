@@ -1,8 +1,6 @@
-import sqlite3
 from flask import current_app, url_for
 from db import get_connection
 import re
-import os
 from passlib.hash import sha256_crypt
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import AES

@@ -2,7 +2,7 @@ import os
 from flask import Flask, render_template, request, make_response, redirect, session, flash, jsonify
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from dotenv import load_dotenv
-from db import get_connection, init_db
+from db import init_db
 import user_service
 import note_service
 from mappers import get_login_attempts_dict, get_notes_dict_list, get_note_dict
