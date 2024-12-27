@@ -30,6 +30,9 @@
 
     <h2>Add New Note</h2>
     <form action="/add_note" id="addNoteForm" method="post">
+        <input type="hidden" name="csrf_token" id="csrf_token">
+        <input style="display: none;" type="text" id="hp_field" name="hp_field">
+        
         <label for="title">Title:</label>
         <input type="text" id="title" name="title" required>
         <br><br>
@@ -113,6 +116,14 @@
         </div>
       </div>
 
+
+    <script>
+        fetch('/get_csrf_token')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('csrf_token').value = data.csrf_token;
+            });
+    </script>
     <script>
         const hasUpperCase = /[A-Z]/;
         const hasLowerCase = /[a-z]/;

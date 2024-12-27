@@ -9,6 +9,9 @@
     <h2>Login page</h2>
     
     <form id="loginForm" action="/" method="POST">
+        <input type="hidden" name="csrf_token" id="csrf_token">
+        <input style="display: none;" type="text" id="hp_field" name="hp_field">
+        
         <label for="username">Username:</label><br>
         <input type="text" id="username" name="username" required><br><br>
         
@@ -36,6 +39,13 @@
     {% endif %}
 
     <p id="errorMessage" style="color: red;"></p>
+    <script>
+        fetch('/get_csrf_token')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('csrf_token').value = data.csrf_token;
+            });
+    </script>
     <script>
         document.getElementById("loginForm").addEventListener("submit", function (event) {
             event.preventDefault();

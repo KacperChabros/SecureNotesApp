@@ -1,5 +1,5 @@
 import os
-from flask import Flask, render_template, request, make_response, redirect, session, flash
+from flask import Flask, render_template, request, make_response, redirect, session, flash, jsonify
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from dotenv import load_dotenv
 from db import get_connection, init_db
@@ -7,6 +7,7 @@ import user_service
 import note_service
 from mappers import get_login_attempts_dict, get_notes_dict_list, get_note_dict
 import markdown
+import secrets
 
 app = Flask(__name__)
 load_dotenv()
@@ -49,6 +50,27 @@ def request_loader(request):
     username = request.form.get('username')
     user = user_loader(username)
     return user
+
+def generate_csrf_token():
+    if '_csrf_token' not in session:
+        session['_csrf_token'] = secrets.token_hex(16)
+    return session['_csrf_token']
+
+@app.route('/get_csrf_token', methods=['GET'])
+def get_csrf_token():
+    return jsonify({'csrf_token': generate_csrf_token()})
+
+@app.before_request
+def validate_csrf():
+    if request.method in ["POST", "PUT", "DELETE"]:
+        csrf_token = session.get('_csrf_token', None)
+        form_token = request.form.get('csrf_token')
+        if not csrf_token or csrf_token != form_token:
+            return "<h1>You are forbidden to perform this action</h1>", 403
+    
+    honeypot = request.form.get('hp_field')
+    if honeypot:
+        return "<h1>You are forbidden to perform this action</h1>", 403
 
 @app.route("/", methods=["GET","POST"])
 def login():
@@ -139,12 +161,11 @@ def rendered_note(note_id):
     note = note_service.fetch_note_if_user_can_view_it(note_id, current_user.userId)
     note_dict = get_note_dict(note)
     if not note:
-        return "<h1>You are unauthorized to view this resource</h1>", 401
+        return "<h1>You are forbidden to perform this action</h1>", 403
     if not note['isCiphered']:
         is_valid_note = note_service.verify_note_authorship(note['userId'], note['sign'], note['content'])
         note_dict['is_valid'] = is_valid_note
         note_dict['content'] = note_service.clean_displayed_content(markdown.markdown(note_dict['content']))
-        print(note_dict['content'])
         return render_template("rendered_note.html", note_dict=note_dict)
     
     if request.method == "GET":
