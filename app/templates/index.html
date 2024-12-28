@@ -39,6 +39,16 @@
         </ul>
     {% endif %}
 
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        <ul class="error">
+            {% for category, message in messages %}
+                <li class="{{ category }}">{{ message }}</li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+    {% endwith %}
+
     <p id="errorMessage" class="error"></p>
 
     <script src="{{ url_for('static', filename='scripts/add_csrf_token.js') }}"></script>

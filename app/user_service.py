@@ -23,7 +23,7 @@ def get_user_by_username(username: str):
         db = get_connection()
         cursor = db.cursor()
         
-        cursor.execute("SELECT * FROM users WHERE username=?", (username,))
+        cursor.execute("SELECT id, username, passwordHash, totpSecretEncrypted FROM users WHERE username=?", (username,))
         
         row = cursor.fetchone()
         
@@ -247,7 +247,7 @@ def get_totp_secret(password: str):
 
 def verify_password_and_totp(user, password: str, totp_code: str):
     '''Method to check if the credentials are valid'''
-    if sha256_crypt.verify(password, user.password):
+    if sha256_crypt.verify(password, user.password_hash):
         decoded_totp = base64.b64decode(user.totp)
         iv = decoded_totp[:16]
         salt = decoded_totp[16:32]
@@ -291,20 +291,19 @@ def get_failed_logins_since_last_successful(userId: int):
 
         return rows
     
-def is_locked_out(userId: int):
+def is_locked_out(ip_address: str):
     with current_app.app_context():
         db = get_connection()
         cursor = db.cursor()
         
         curr_time = datetime.now(timezone.utc)
         time_threshold = curr_time - timedelta(minutes=15)
-        cursor.execute("SELECT COUNT(*) FROM  loginAttempts WHERE userId = ? AND isSuccess = 0 AND time >= ?", (userId, time_threshold))
-        
+        cursor.execute("SELECT COUNT(*) FROM  loginAttempts WHERE ipAddress = ? AND isSuccess = 0 AND time >= ?", (ip_address, time_threshold))
         number_of_attempts = cursor.fetchone()
         
         db.close()
 
-        return number_of_attempts[0] >= 5
+        return number_of_attempts[0] >= 3
 
 def generate_reset_password_token(userId: int, email: str):
     with current_app.app_context():

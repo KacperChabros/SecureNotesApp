@@ -9,12 +9,18 @@ from mappers import get_login_attempts_dict, get_notes_dict_list, get_note_dict
 import markdown
 import secrets
 import time
+from datetime import timedelta
 
 app = Flask(__name__)
 load_dotenv()
 app.config['DATABASE_URL'] = os.getenv('DATABASE_URL')
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=30)
+app.config['SESSION_COOKIE_SECURE'] = True
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.secret_key = os.getenv('SECRET_KEY')
 login_manager = LoginManager()
+login_manager.login_view = 'login'
 login_manager.init_app(app)
 
 
@@ -32,16 +38,13 @@ def user_loader(username):
 
     row = user_service.get_user_by_username(username)
     try:
-        id, username, email, password, publicKey, privateKey, totp = row
+        id, username, password_hash, totp = row
     except:
         return None
     user = User()
     user.id = username
     user.userId = id
-    user.password = password
-    user.email = email
-    user.public_key = publicKey
-    user.private_key = privateKey
+    user.password_hash = password_hash
     user.totp = totp
     return user
 
@@ -62,16 +65,20 @@ def get_csrf_token():
     return jsonify({'csrf_token': generate_csrf_token()})
 
 @app.before_request
-def validate_csrf():
+def validate_csrf_and_hp():
     if request.method in ["POST", "PUT", "DELETE"]:
         csrf_token = session.get('_csrf_token', None)
         form_token = request.form.get('csrf_token')
         if not csrf_token or csrf_token != form_token:
-            return "<h1>You are forbidden to perform this action CSRF</h1>", 403
+            return "<h1>You are forbidden to perform this action</h1>", 403
     
     honeypot = request.form.get('hp_field')
     if honeypot:
-        return "<h1>You are forbidden to perform this action BOT</h1>", 403
+        return "<h1>You are forbidden to perform this action</h1>", 403
+
+@app.before_request
+def refresh_session():
+    session.permanent = True
 
 @app.after_request
 def add_csp_header(response):
@@ -86,9 +93,16 @@ def add_csp_header(response):
     response.headers['Content-Security-Policy'] = csp_policy
     return response
 
+@login_manager.unauthorized_handler
+def unauthorized():
+    flash("Please, log in to access this website")
+    return redirect("/")
+
 @app.route("/", methods=["GET","POST"])
 def login():
     if request.method == "GET":
+        if current_user.is_authenticated:
+            return redirect('/home')
         return render_template("index.html")
     if request.method == "POST":
         time.sleep(0.4)
@@ -107,9 +121,9 @@ def login():
             time.sleep(0.230)
             return render_template("index.html", error='Wrong username and/or password provided'), 401
         
-        if user_service.is_locked_out(user.userId):
+        if user_service.is_locked_out(ip_address):
             time.sleep(0.230)
-            return render_template("index.html", error='Your account has been locked out due to too many failed login attempts. Try again in 15 minutes'), 401
+            return render_template("index.html", error='You have been locked out due to too many failed login attempts. Try again in 15 minutes'), 401
 
         start_time = time.time()
         if not user_service.verify_password_and_totp(user, password, totp_code):
@@ -127,6 +141,8 @@ def login():
 @app.route("/register", methods=["GET","POST"])
 def register():
     if request.method == "GET":
+        if current_user.is_authenticated:
+            return redirect('/home')
         return render_template("register.html")
     if request.method == "POST":
         time.sleep(0.3)
@@ -182,10 +198,11 @@ def home():
 @app.route("/rendered_note/<note_id>", methods=["GET", "POST"])
 @login_required
 def rendered_note(note_id):
-    note = note_service.fetch_note_if_user_can_view_it(note_id, current_user.userId)
-    note_dict = get_note_dict(note)
+    note = note_service.fetch_note_if_user_can_view_it(note_id, current_user.userId)   
     if not note:
-        return "<h1>You are forbidden to perform this action</h1>", 403
+        return render_template('forbidden.html'), 403
+
+    note_dict = get_note_dict(note)
     if not note['isCiphered']:
         is_valid_note = note_service.verify_note_authorship(note['userId'], note['sign'], note['content'])
         note_dict['is_valid'] = is_valid_note
@@ -202,7 +219,7 @@ def rendered_note(note_id):
         decrypted_content = note_service.decrypt_note(note_password, note['notePasswordHash'], note['content'])
         elapsed_time = time.time() - start_time
         if elapsed_time < 0.3:
-                time.sleep(0.3 - elapsed_time)
+            time.sleep(0.3 - elapsed_time)
         if not decrypted_content:
             return render_template("ciphered_note.html", note_id=note_id, error="Wrong credentials provided")
         note_dict['content'] = decrypted_content
