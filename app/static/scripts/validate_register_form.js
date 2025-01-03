@@ -29,6 +29,7 @@ document.getElementById("registerForm").addEventListener("submit", function (eve
 
     errorMessage.textContent = "";
     
+    
     if (!username || !email || !password || !passwordRepeat) {
         errorMessage.textContent = "All fields must be filled";
         return;
@@ -37,6 +38,15 @@ document.getElementById("registerForm").addEventListener("submit", function (eve
     var errorMsg = "";
     if (username.length < 3 || username.length > 40){
         errorMsg = "Username must be between 3 and 40 characters | ";
+    }
+
+    const usernameRegex = /^[a-z][a-z0-9]*$/;
+    if (!usernameRegex.test(username)){
+        errorMsg += "Only lower letters and digits are permitted for username (first character must be a letter) | ";
+    }
+
+    if(email.length < 6 || email.length > 320){
+        errorMsg += "Email must be between 6 and 320 characters | ";
     }
 
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/; //owasp email regex
@@ -61,6 +71,11 @@ document.getElementById("registerForm").addEventListener("submit", function (eve
         errorMsg +="Password must contain a special character | ";
     }
 
+    const passwordRegex = /^[a-zA-Z0-9 !"#$%&'()*+,\-./:;<=>?@[\]\\^_`{|}~]+$/;
+    if(!passwordRegex.test(password)){
+        errorMsg += "Password contains an illegal character | ";
+    }
+
     const entropy = calculateEntropy(password);
     if (entropy < 59){
         errorMsg += "Password is too weak | ";
@@ -69,7 +84,6 @@ document.getElementById("registerForm").addEventListener("submit", function (eve
     if (password !== passwordRepeat) {
         errorMsg += "Passwords do not match";
     }
-
 
     if(errorMsg){
         errorMessage.textContent = errorMsg;

@@ -29,18 +29,19 @@ document.getElementById("addNoteForm").addEventListener("submit", function (even
     const note_password = document.getElementById("note_password").value;
     const note_password_repeat = document.getElementById("note_password_repeat").value;
     const user_password = document.getElementById("user_password").value;
-    const totp_code = document.getElementById("totp_code").value;
+    const totp_code = document.getElementById("totp_code").value.trim();
 
 
     errorMessage.textContent = "";
             
     var errorMsg = '';
-    if (!title || !content) {
-        errorMsg += "Title and Content fields are required | ";
+    if (!title || !content || !user_password || !totp_code) {
+        errorMsg += "Title, Content, User's Password and TOTP fields are required | ";
     }
 
-    if (title.length < 4 || title.length > 50){
-        errorMsg += "Title must be between 4 and 50 characters | ";
+    const titleRegex = /^[a-zA-Z0-9.,!?()\- ]{4,50}$/;
+    if (!titleRegex.test(title)){
+        errorMsg += "Title must be between 4 and 50 characters and contain only lowercase, uppercase, digits and following characters: '.,!? ()-' | ";
     }
 
     if (content.length < 5 || title.length > 2500){
@@ -49,6 +50,11 @@ document.getElementById("addNoteForm").addEventListener("submit", function (even
 
     if (sharedToUsername && (sharedToUsername.length < 3 || sharedToUsername.length > 40)){
         errorMsg += "If set, Username must be between 3 and 40 characters | ";
+    }
+
+    const usernameRegex = /^[a-z][a-z0-9]*$/;
+    if (sharedToUsername && !usernameRegex.test(sharedToUsername)){
+        errorMsg += "Only lower letters and digits are permitted for username (first character must be a letter) | ";
     }
             
     if ((note_password && !note_password_repeat) || (!note_password && note_password_repeat)) {
@@ -73,6 +79,11 @@ document.getElementById("addNoteForm").addEventListener("submit", function (even
             errorMsg +="Note Password must contain a special character | ";
         }
                 
+        const passwordRegex = /^[a-zA-Z0-9 !"#$%&'()*+,\-./:;<=>?@[\]\\^_`{|}~]+$/;
+        if(!passwordRegex.test(note_password)){
+            errorMsg += "Note Password contains an illegal character | ";
+        }
+
         const entropy = calculateEntropy(note_password);
         if (entropy < 59){
             errorMsg += "Note Password is too weak | ";
@@ -83,7 +94,8 @@ document.getElementById("addNoteForm").addEventListener("submit", function (even
         }
     } 
 
-    if (totp_code.length != 6){
+    const totpRegex = /^[0-9]{6}$/;
+    if (!totpRegex.test(totp_code)){
         errorMsg += "Invalid TOTP format";
     }
 

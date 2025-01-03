@@ -104,10 +104,25 @@ def validate_register_data(username: str, email: str, password: str, password_re
     
     if len(username) < 3 or len(username) > 40:
         errors['username'] = 'Username must be between 3 and 40 characters'
-    
+
+    username_regex = r"^[a-z][a-z0-9]*$"
+    if not re.fullmatch(username_regex, username):
+        err = "Only lower letters and digits are permitted for username (first character must be a letter) | "
+        if 'username' in errors:
+            errors['username'] = err + errors['username']
+        else:
+            errors['username'] = err
+
+    if len(email) < 6 or len(email) > 320:
+        errors['email'] = 'Email must be between 6 and 320 characters'
+
     email_pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
     if not re.fullmatch(email_pattern, email):
-        errors['email'] = 'Email is invalid'
+        err = "Email is invalid | "
+        if 'email' in errors:
+            errors['email'] = err + errors['email']
+        else:
+            errors['email'] = err
 
     pass_error = validate_password(password, password_repeat)
     if pass_error:
@@ -120,6 +135,11 @@ def validate_register_data(username: str, email: str, password: str, password_re
 def validate_password(password, password_repeat):
     pass_error = ''
     charSetSize = 0
+
+    if not password or not password_repeat:
+        pass_error = 'Password and Password repeat cannot be empty'
+        return pass_error
+
     if len(password) < 12:
         pass_error = 'Password must be at least 12 characters | '
     if not re.search(r"[a-z]", password):
@@ -142,6 +162,10 @@ def validate_password(password, password_repeat):
     else:
         charSetSize += 32
 
+    password_regex = r"^[a-zA-Z0-9 !\"#$%&'()*+,\-./:;<=>?@\[\]\\^_`{|}~]+$"
+    if not re.fullmatch(password_regex, password):
+        pass_error += "Password contains an illegal character | "
+
     entropy = len(password) * math.log2(charSetSize)
     if entropy < 59:
         pass_error += "Password is too weak | "
@@ -161,7 +185,16 @@ def validate_login_data(username: str, password: str, totp_code: str):
     if len(username) < 3 or len(username) > 40:
         errors['username'] = 'Username must be between 3 and 40 characters'
 
-    if len(totp_code) != 6:
+    username_regex = r"^[a-z][a-z0-9]*$"
+    if not re.fullmatch(username_regex, username):
+        err = "Only lower letters and digits are permitted for username (first character must be a letter) | "
+        if 'username' in errors:
+            errors['username'] = err + errors['username']
+        else:
+            errors['username'] = err
+
+    totp_regex = r"^[0-9]{6}$"
+    if not re.fullmatch(totp_regex, totp_code):
         errors['TOTP'] = 'Invalid TOTP code format'
 
     if errors:
@@ -177,10 +210,25 @@ def validate_forgot_password_data(username: str, email: str):
     
     if len(username) < 3 or len(username) > 40:
         errors['username'] = 'Username must be between 3 and 40 characters'
-    
+
+    username_regex = r"^[a-z][a-z0-9]*$"
+    if not re.fullmatch(username_regex, username):
+        err = "Only lower letters and digits are permitted for username (first character must be a letter) | "
+        if 'username' in errors:
+            errors['username'] = err + errors['username']
+        else:
+            errors['username'] = err
+
+    if len(email) < 6 or len(email) > 320:
+        errors['email'] = 'Email must be between 6 and 320 characters'
+
     email_pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
     if not re.fullmatch(email_pattern, email):
-        errors['email'] = 'Email is invalid'
+        err = "Email is invalid | "
+        if 'email' in errors:
+            errors['email'] = err + errors['email']
+        else:
+            errors['email'] = err
 
     if errors:
         return {"valid": False, "errors": errors}

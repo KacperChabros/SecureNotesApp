@@ -109,7 +109,7 @@ def login():
         is_success = False
         ip_address = request.remote_addr
         username = request.form.get("username").strip()
-        password = request.form.get("password").strip()
+        password = request.form.get("password")
         totp_code = request.form.get("totp_code").strip()
 
         validation_result = user_service.validate_login_data(username, password, totp_code)
@@ -147,8 +147,8 @@ def register():
     if request.method == "POST":
         time.sleep(0.3)
         username = request.form.get("username").strip()
-        password = request.form.get("password").strip()
-        password_repeat = request.form.get("password_repeat").strip()
+        password = request.form.get("password")
+        password_repeat = request.form.get("password_repeat")
         email = request.form.get("email").strip()
 
         validation_result = user_service.validate_register_data(username, email, password, password_repeat)
@@ -215,6 +215,10 @@ def rendered_note(note_id):
     if request.method == "POST":
         time.sleep(0.4)
         note_password = request.form.get("note_password")
+        validation_result = note_service.validate_ciphered_note_data(note_password)
+        if not validation_result["valid"]:
+            time.sleep(0.3)
+            return render_template("ciphered_note.html", note_id=note_id, error=validation_result['error']), 401
         start_time = time.time()
         decrypted_content = note_service.decrypt_note(note_password, note['notePasswordHash'], note['content'])
         elapsed_time = time.time() - start_time
@@ -240,12 +244,12 @@ def add_note():
         content = request.form.get("content").strip()
         is_public = 1 if request.form.get("isPublic") == "on" else 0
         shared_to_username = request.form.get("sharedToUsername").strip()
-        user_password = request.form.get("user_password").strip()
-        note_password = request.form.get("note_password").strip()
-        note_password_repeat = request.form.get("note_password_repeat").strip()
+        user_password = request.form.get("user_password")
+        note_password = request.form.get("note_password")
+        note_password_repeat = request.form.get("note_password_repeat")
         totp_code = request.form.get("totp_code").strip()
 
-        validation_result = note_service.validate_note_data(title, content, shared_to_username, note_password, note_password_repeat, totp_code)
+        validation_result = note_service.validate_note_data(title, content, user_password, shared_to_username, note_password, note_password_repeat, totp_code)
         if not validation_result["valid"]:
             for error_key, error_msg in validation_result["errors"].items():
                 flash(f"{error_key}: {error_msg}", 'error')
@@ -274,8 +278,8 @@ def forgot_password():
         return render_template("forgot_password.html")
     if request.method == "POST":
         time.sleep(0.5)
-        username = request.form.get('username')
-        email = request.form.get('email')
+        username = request.form.get('username').strip()
+        email = request.form.get('email').strip()
         validation_result = user_service.validate_forgot_password_data(username, email)
         if not validation_result["valid"]:
             return render_template("forgot_password.html", errors=validation_result['errors']), 401
@@ -291,8 +295,8 @@ def reset_password(token):
         return render_template("reset_password.html", token=token)
     if request.method == "POST":
         time.sleep(0.3)
-        password = request.form.get("password").strip()
-        password_repeat = request.form.get("password_repeat").strip()
+        password = request.form.get("password")
+        password_repeat = request.form.get("password_repeat")
 
         pass_val_error = user_service.validate_password(password, password_repeat)
         if pass_val_error:

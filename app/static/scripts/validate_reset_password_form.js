@@ -50,6 +50,11 @@ document.getElementById("resetPasswordForm").addEventListener("submit", function
         errorMsg +="Password must contain a special character | ";
     }
 
+    const passwordRegex = /^[a-zA-Z0-9 !"#$%&'()*+,\-./:;<=>?@[\]\\^_`{|}~]+$/;
+    if(!passwordRegex.test(password)){
+        errorMsg += "Password contains an illegal character | ";
+    }
+
     const entropy = calculateEntropy(password);
     if (entropy < 59){
         errorMsg += "Password is too weak | ";

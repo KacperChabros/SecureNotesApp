@@ -8,7 +8,7 @@
 </head>
 <body>
     <h1>This note is encrypted</h1>
-    <form method="POST" action="{{ url_for('rendered_note', note_id=note_id) }}">
+    <form id="cipheredNoteForm" method="POST" action="{{ url_for('rendered_note', note_id=note_id) }}">
         <input type="hidden" name="csrf_token" id="csrf_token">
         <input type="text" id="hp_field" name="hp_field">
 
@@ -20,9 +20,13 @@
     {% if error %}
         <p class="error">{{error}}</p>
     {% endif %}
+    <p id="errorMessage" class="error"></p>
+
 
     <a href="/home">Go back to home page</a>
 
     <script src="{{ url_for('static', filename='scripts/add_csrf_token.js') }}"></script>
+    <script src="{{ url_for('static', filename='scripts/validate_ciphered_note_form.js') }}"></script>
+
 </body>
 </html>

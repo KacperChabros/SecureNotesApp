@@ -17,6 +17,15 @@ document.getElementById("forgotPasswordForm").addEventListener("submit", functio
         errorMsg = "Username must be between 3 and 40 characters | ";
     }
 
+    const usernameRegex = /^[a-z][a-z0-9]*$/;
+    if (!usernameRegex.test(username)){
+        errorMsg += "Only lower letters and digits are permitted for username (first character must be a letter) | ";
+    }
+
+    if(email.length < 6 || email.length > 320){
+        errorMsg += "Email must be between 6 and 320 characters | ";
+    }
+
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/; //owasp email regex
     if (!emailRegex.test(email)) {
         errorMsg += "Email address is invalid | ";

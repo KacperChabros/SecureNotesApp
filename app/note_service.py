@@ -12,6 +12,7 @@ from Crypto.Random import get_random_bytes
 from passlib.hash import sha256_crypt
 from bleach import clean
 import time
+import re
 
 def get_notes_created_by_user(userId: int):
     """Method for getting all user's notes"""
@@ -56,21 +57,25 @@ def get_public_notes():
         return rows
 
 
-def validate_note_data(title: str, content: str, sharedToUsername: str, note_password: str, note_password_repeat: str, totp_code: str):
+def validate_note_data(title: str, content: str, user_password: str, sharedToUsername: str, note_password: str, note_password_repeat: str, totp_code: str):
     '''Method for validating note data'''
     errors = {}
 
-    if not title or not content:
-        errors['general'] = 'Title and Content fields are required.'
+    if not title or not content or not user_password or not totp_code:
+        errors['general'] = 'Title, Content, User\'s password and TOTP fields are required.'
     
-    if len(title) < 4 or len(title) > 50:
-        errors['title'] = 'Title must be between 4 and 50 characters.'
+    title_regex = r"^[a-zA-Z0-9.,!?()\-\ ]{4,50}$"
+    if not re.fullmatch(title_regex, title):
+        errors['title'] = 'Title must be between 4 and 50 characters and contain only lowercase, uppercase, digits and following characters: \'.,!? ()-'
 
     if len(content) < 5 or len(content) > 2500:
         errors['content'] = 'Content must be between 5 and 2500 characters.'
 
+    username_regex = r"^[a-z][a-z0-9]*$"
     if sharedToUsername and (len(sharedToUsername) < 3 or len(sharedToUsername) > 40):
         errors['sharedToUsername'] = 'If set, Username must be between 3 and 40 characters.'
+    elif sharedToUsername and not re.fullmatch(username_regex, sharedToUsername):
+        errors['sharedToUsername'] = 'If set, "Only lower letters and digits are permitted for username (first character must be a letter)'
     elif sharedToUsername and not validate_user_exists(sharedToUsername, None):
         errors['sharedToUsername'] = 'This user does not exist'
 
@@ -83,13 +88,26 @@ def validate_note_data(title: str, content: str, sharedToUsername: str, note_pas
         if passError:
             errors['note_password'] = passError
 
-    if len(totp_code) != 6:
+    totp_regex = r"^[0-9]{6}$"
+    if not re.fullmatch(totp_regex, totp_code):
         errors['TOTP'] = 'Invalid TOTP code format'
 
     if errors:
         return {"valid": False, "errors": errors}
 
     return {"valid": True}
+
+def validate_ciphered_note_data(password: str):
+    error = None
+
+    if not password:
+        error = "Password cannot be empty"
+        
+    if error:
+        return {"valid": False, "error": error}
+
+    return {"valid": True}
+
 
 def sign_and_add_note(curr_user_id: int, title: str, content: str, shared_with_username: str, is_public: bool, user_password: str, note_password: str):
     '''Method to sign and add note'''
