@@ -121,6 +121,9 @@ def sign_and_add_note(curr_user_id: int, title: str, content: str, shared_with_u
             return False
 
         priv_key_text = decrypt_priv_key(row['privateKeyEncrypted'], user_password)
+        if not priv_key_text:
+            time.sleep(0.3)
+            return False
         signature = sign_message(priv_key_text, content)
         del priv_key_text
         del user_password
@@ -155,36 +158,41 @@ def sign_and_add_note(curr_user_id: int, title: str, content: str, shared_with_u
 
 def decrypt_priv_key(encrypted_priv_key, user_password):
     decoded_priv_key = base64.b64decode(encrypted_priv_key)
-    iv_d = decoded_priv_key[:16]
-    salt_d = decoded_priv_key[16:32]
-    ciphertext_d = decoded_priv_key[32:]
+    nonce_d = decoded_priv_key[:12]
+    salt_d = decoded_priv_key[12:28]
+    tag_d = decoded_priv_key[28:44]
+    ciphertext_d = decoded_priv_key[44:]
     key_d = PBKDF2(user_password, salt_d, dkLen=32)
-    cipher_d = AES.new(key_d, AES.MODE_CBC, iv_d)
-    padded_decyphered = cipher_d.decrypt(ciphertext_d)
-    retrieved_priv_key = unpad(padded_decyphered, AES.block_size).decode('utf-8')
+    cipher = AES.new(key_d, AES.MODE_GCM, nonce=nonce_d)
+    retrieved_priv_key = None
+    try:
+        retrieved_priv_key = cipher.decrypt_and_verify(ciphertext_d, tag_d).decode('utf-8')
+    except (ValueError, KeyError):
+        pass
     del decoded_priv_key
-    del iv_d
+    del nonce_d
     del salt_d
     del ciphertext_d
     del key_d
-    del cipher_d
-    del padded_decyphered
+    del cipher
+    del tag_d
+
     return retrieved_priv_key
 
 def encrypt_note(note_password: str, content: str):
+    nonce = get_random_bytes(12)
     salt = get_random_bytes(16)
-    iv = get_random_bytes(16)
     key = PBKDF2(note_password, salt, dkLen=32)
-    cipher = AES.new(key, AES.MODE_CBC, iv)
-    padded_note_content = pad(content.encode('utf-8'), AES.block_size)
-    encrypted_note_content = cipher.encrypt(padded_note_content)
-    encrypted_note_base64 = base64.b64encode(iv + salt + encrypted_note_content).decode('utf-8')
+    cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
+    encrypted_note_content, tag = cipher.encrypt_and_digest(content.encode('utf-8'))
+    encrypted_note_base64 = base64.b64encode(nonce + salt + tag + encrypted_note_content).decode('utf-8')
     del salt
-    del iv
+    del nonce
     del key
     del cipher
-    del padded_note_content
+    del tag
     del encrypted_note_content
+
     return encrypted_note_base64 
 
 def sign_message(priv_key_text: str, content: str):
@@ -216,20 +224,24 @@ def decrypt_note(note_password: str, note_password_hash: str, encrypted_note: st
     if not sha256_crypt.verify(note_password, note_password_hash):
         return False
     decoded_note = base64.b64decode(encrypted_note)
-    iv = decoded_note[:16]
-    salt = decoded_note[16:32]
-    note_ciphertext = decoded_note[32:]
+    nonce = decoded_note[:12]
+    salt = decoded_note[12:28]
+    tag = decoded_note[28:44]
+    note_ciphertext = decoded_note[44:]
     key = PBKDF2(note_password, salt, dkLen=32)
-    cipher = AES.new(key, AES.MODE_CBC, iv)
-    padded_deciphered = cipher.decrypt(note_ciphertext)
-    decrypted_note = unpad(padded_deciphered, AES.block_size).decode('utf-8')
+    cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
+    decrypted_note = None
+    try:
+        decrypted_note = cipher.decrypt_and_verify(note_ciphertext, tag).decode('utf-8')
+    except (ValueError, KeyError):
+        pass
     del decoded_note
-    del iv
+    del nonce
     del salt
     del note_ciphertext
     del key
     del cipher
-    del padded_deciphered
+    del tag
     
     return decrypted_note
     

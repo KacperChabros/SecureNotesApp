@@ -98,6 +98,10 @@ def unauthorized():
     flash("Please, log in to access this website")
     return redirect("/")
 
+@app.errorhandler(Exception)
+def handle_exception(e):
+    return render_template("error.html"), 500
+
 @app.route("/", methods=["GET","POST"])
 def login():
     if request.method == "GET":

@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Error</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles/styles.css') }}">
+</head>
+<body>
+    <h1>An unusual error occurred</h1>
+
+    <a href="/">Go back to safety</a>
+
+    <script src="{{ url_for('static', filename='scripts/add_csrf_token.js') }}"></script>
+    <script src="{{ url_for('static', filename='scripts/validate_ciphered_note_form.js') }}"></script>
+
+</body>
+</html>

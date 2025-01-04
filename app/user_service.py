@@ -254,60 +254,63 @@ def hash_password(password: str):
     return sha256_crypt.hash(password, rounds=550000)
 
 def get_rsa_keys(password: str):
+    nonce = get_random_bytes(12)
     salt = get_random_bytes(16)
-    iv = get_random_bytes(16) 
     key = PBKDF2(password, salt, dkLen=32)
-    cipher = AES.new(key, AES.MODE_CBC, iv)
-
+    cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
 
     keys = RSA.generate(2048)
     private_key = keys.export_key()
     public_key = keys.publickey().export_key()
 
-    padded_priv_key = pad(private_key, AES.block_size)
-    ciphertext = cipher.encrypt(padded_priv_key)
-    encrypted_priv_key = base64.b64encode(iv + salt + ciphertext).decode('utf-8')
+    priv_key_ciphertext, tag = cipher.encrypt_and_digest(private_key)
+    encrypted_priv_key = base64.b64encode(nonce + salt + tag + priv_key_ciphertext).decode('utf-8')
+
     del salt
-    del iv
+    del nonce
     del key
     del cipher
     del private_key
-    del padded_priv_key
-    del ciphertext
+    del priv_key_ciphertext
+    del tag
+
     return keys, encrypted_priv_key
 
 def get_totp_secret(password: str):
     totp_secret = pyotp.random_base32()
     salt_totp = get_random_bytes(16)
-    iv_totp = get_random_bytes(16)
+    nonce_totp = get_random_bytes(12)
     key_totp = PBKDF2(password, salt_totp, dkLen=32)
-    cipher_totp = AES.new(key_totp, AES.MODE_CBC, iv_totp)
-    padded_totp = pad(totp_secret.encode('utf-8'), AES.block_size)
-    encrypted_totp = cipher_totp.encrypt(padded_totp)
-    encrypted_totp_secret = base64.b64encode(iv_totp + salt_totp + encrypted_totp).decode('utf-8')
+    cipher_totp = AES.new(key_totp, AES.MODE_GCM, nonce=nonce_totp)
+    encrypted_totp, tag = cipher_totp.encrypt_and_digest(totp_secret.encode('utf-8'))
+    encrypted_totp_secret = base64.b64encode(nonce_totp + salt_totp + tag + encrypted_totp).decode('utf-8')
     del salt_totp
-    del iv_totp
+    del nonce_totp
     del key_totp
     del cipher_totp
-    del padded_totp
+    del tag
     del encrypted_totp
+
     return totp_secret, encrypted_totp_secret
 
 def verify_password_and_totp(user, password: str, totp_code: str):
     '''Method to check if the credentials are valid'''
     if sha256_crypt.verify(password, user.password_hash):
         decoded_totp = base64.b64decode(user.totp)
-        iv = decoded_totp[:16]
-        salt = decoded_totp[16:32]
-        totp_ciphertext = decoded_totp[32:]
+        nonce = decoded_totp[:12]
+        salt = decoded_totp[12:28]
+        tag = decoded_totp[28:44]
+        totp_ciphertext = decoded_totp[44:]
         key = PBKDF2(password, salt, dkLen=32)
-        cipher = AES.new(key, AES.MODE_CBC, iv)
-        padded_deciphered = cipher.decrypt(totp_ciphertext)
-        retrieved_totp_secret = unpad(padded_deciphered, AES.block_size).decode('utf-8')
-        totp = pyotp.TOTP(retrieved_totp_secret)
-        del retrieved_totp_secret
-        if totp.verify(totp_code):
-            return True
+        cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
+        try:
+            decrypted_totp_secret = cipher.decrypt_and_verify(totp_ciphertext, tag).decode('utf-8')
+            totp = pyotp.TOTP(decrypted_totp_secret)
+            del decrypted_totp_secret
+            if totp.verify(totp_code):
+                return True
+        except (ValueError, KeyError):
+            pass
     else:
         time.sleep(0.04)
     return False
