@@ -42,7 +42,7 @@ def init_db():
         db.cursor().execute('''
             CREATE TABLE IF NOT EXISTS loginAttempts (
                 attemptId INTEGER PRIMARY KEY AUTOINCREMENT,
-                userId INTEGER NOT NULL,
+                userId INTEGER NULL,
                 time DATETIME NOT NULL,
                 ipAddress TEXT NOT NULL,
                 isSuccess BOOLEAN NOT NULL,
@@ -58,6 +58,14 @@ def init_db():
                 tokenHash TEXT NOT NULL,
                 isUsed BOOLEAN NOT NULL DEFAULT FALSE,
                 FOREIGN KEY (userId) REFERENCES users(id)
+            );
+        ''')
+        db.cursor().execute('''
+            CREATE TABLE IF NOT EXISTS resetPasswordAttempts (
+                attemptId INTEGER PRIMARY KEY AUTOINCREMENT,
+                time DATETIME NOT NULL,
+                ipAddress TEXT NOT NULL,
+                isGeneratingToken BOOLEAN NOT NULL
             );
         ''')
 

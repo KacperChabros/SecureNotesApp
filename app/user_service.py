@@ -317,9 +317,9 @@ def register_login_attempt(userId: int, ip_address: str, is_success: bool):
         curr_time = datetime.now(timezone.utc)
         db = get_connection()
         cursor = db.cursor()
-        
+
         cursor.execute("INSERT INTO loginAttempts(userId, time, ipAddress, isSuccess) VALUES(?,?,?,?)", (userId, curr_time, ip_address, is_success))
-        
+
         db.commit()
         
         db.close()
@@ -345,13 +345,39 @@ def is_locked_out(ip_address: str):
         cursor = db.cursor()
         
         curr_time = datetime.now(timezone.utc)
-        time_threshold = curr_time - timedelta(minutes=15)
+        time_threshold = curr_time - timedelta(minutes=20)
         cursor.execute("SELECT COUNT(*) FROM  loginAttempts WHERE ipAddress = ? AND isSuccess = 0 AND time >= ?", (ip_address, time_threshold))
         number_of_attempts = cursor.fetchone()
         
         db.close()
 
+        return number_of_attempts[0] >= 5
+    
+def is_locked_out_on_pass_reset(ip_address: str, is_generating_token=True):
+    with current_app.app_context():
+        db = get_connection()
+        cursor = db.cursor()
+        
+        curr_time = datetime.now(timezone.utc)
+        time_threshold = curr_time - timedelta(minutes=60)
+        cursor.execute("SELECT COUNT(*) FROM  resetPasswordAttempts WHERE ipAddress = ? AND time >= ? AND isGeneratingToken = ?", (ip_address, time_threshold, is_generating_token))
+        number_of_attempts = cursor.fetchone()
+        
+        db.close()
+
         return number_of_attempts[0] >= 3
+    
+def register_pass_reset_attempt(ip_address: str, is_generating_token: bool):
+    with current_app.app_context():
+        curr_time = datetime.now(timezone.utc)
+        db = get_connection()
+        cursor = db.cursor()
+        
+        cursor.execute("INSERT INTO resetPasswordAttempts(time, ipAddress, isGeneratingToken) VALUES(?,?,?)", (curr_time, ip_address, is_generating_token))
+        
+        db.commit()
+        
+        db.close()
 
 def generate_reset_password_token(userId: int, email: str):
     with current_app.app_context():

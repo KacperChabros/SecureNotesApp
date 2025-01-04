@@ -116,14 +116,15 @@ def login():
         if not validation_result["valid"]:
             return render_template("index.html", errors=validation_result['errors']), 401
         
-        user = user_loader(username)  
-        if user is None:
-            time.sleep(0.230)
-            return render_template("index.html", error='Wrong username and/or password provided'), 401
-        
         if user_service.is_locked_out(ip_address):
             time.sleep(0.230)
-            return render_template("index.html", error='You have been locked out due to too many failed login attempts. Try again in 15 minutes'), 401
+            return render_template("index.html", error='You have been locked out due to too many failed login attempts. Try again in 20 minutes'), 401
+        
+        user = user_loader(username)  
+        if user is None:
+            user_service.register_login_attempt(None, ip_address, is_success)
+            time.sleep(0.230)
+            return render_template("index.html", error='Wrong username and/or password provided'), 401
 
         start_time = time.time()
         if not user_service.verify_password_and_totp(user, password, totp_code):
@@ -280,9 +281,18 @@ def forgot_password():
         time.sleep(0.5)
         username = request.form.get('username').strip()
         email = request.form.get('email').strip()
+        ip_address = request.remote_addr
+        
+        
         validation_result = user_service.validate_forgot_password_data(username, email)
         if not validation_result["valid"]:
             return render_template("forgot_password.html", errors=validation_result['errors']), 401
+        
+        user_service.register_pass_reset_attempt(ip_address=ip_address, is_generating_token=True)
+        if user_service.is_locked_out_on_pass_reset(ip_address, is_generating_token=True):
+            time.sleep(0.85)
+            return render_template("forgot_password.html", error='You have been locked out due to too many failed password reset attempts. Try again in an hour'), 401
+
         user = user_service.get_user_by_username_and_email(username, email)
         if not user:
             return render_template("forgot_password.html", message = "Reset password email was sent to the provided email if user with given username and email exists")
@@ -297,11 +307,18 @@ def reset_password(token):
         time.sleep(0.3)
         password = request.form.get("password")
         password_repeat = request.form.get("password_repeat")
-
+        ip_address = request.remote_addr
+        
         pass_val_error = user_service.validate_password(password, password_repeat)
         if pass_val_error:
             time.sleep(0.85)
             return render_template("reset_password.html", error=pass_val_error, token=token)
+        
+        user_service.register_pass_reset_attempt(ip_address=ip_address, is_generating_token=False)
+        if user_service.is_locked_out_on_pass_reset(ip_address, is_generating_token=False):
+            time.sleep(0.85)
+            return render_template("reset_password.html", error='You have been locked out due to too many failed password reset attempts. Try again in an hour', token=token), 401
+
         validation_result = user_service.validate_token(token)
         if not validation_result['valid']:
             time.sleep(0.81)
