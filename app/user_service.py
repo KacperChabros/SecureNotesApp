@@ -311,17 +311,28 @@ def verify_password_and_totp(user, password: str, totp_code: str):
                 return True
         except (ValueError, KeyError):
             pass
-    else:
-        time.sleep(0.04)
+
     return False
 
-def register_login_attempt(userId: int, ip_address: str, is_success: bool):
+def register_login_attempt(userId: int, ip_address: str, is_success: bool, user_agent: str):
     with current_app.app_context():
         curr_time = datetime.now(timezone.utc)
         db = get_connection()
         cursor = db.cursor()
 
-        cursor.execute("INSERT INTO loginAttempts(userId, time, ipAddress, isSuccess) VALUES(?,?,?,?)", (userId, curr_time, ip_address, is_success))
+        cursor.execute("INSERT INTO loginAttempts(userId, time, ipAddress, isSuccess, userAgent) VALUES(?,?,?,?,?)", (userId, curr_time, ip_address, is_success, user_agent))
+
+        db.commit()
+        
+        db.close()
+
+def register_registration_attempt(ip_address: str, user_agent: str):
+    with current_app.app_context():
+        curr_time = datetime.now(timezone.utc)
+        db = get_connection()
+        cursor = db.cursor()
+
+        cursor.execute("INSERT INTO registrationAttempts(time, ipAddress, userAgent) VALUES(?,?,?)", ( curr_time, ip_address, user_agent))
 
         db.commit()
         
@@ -355,7 +366,22 @@ def is_locked_out(ip_address: str):
         db.close()
 
         return number_of_attempts[0] >= 5
-    
+
+def is_locked_out_on_registration(ip_address: str):
+    with current_app.app_context():
+        db = get_connection()
+        cursor = db.cursor()
+        
+        curr_time = datetime.now(timezone.utc)
+        time_threshold = curr_time - timedelta(minutes=60)
+        cursor.execute("SELECT COUNT(*) FROM  registrationAttempts WHERE ipAddress = ? AND time >= ?", (ip_address, time_threshold))
+        number_of_attempts = cursor.fetchone()
+        
+        db.close()
+
+        return number_of_attempts[0] >= 5
+
+
 def is_locked_out_on_pass_reset(ip_address: str, is_generating_token=True):
     with current_app.app_context():
         db = get_connection()
@@ -370,13 +396,13 @@ def is_locked_out_on_pass_reset(ip_address: str, is_generating_token=True):
 
         return number_of_attempts[0] >= 3
     
-def register_pass_reset_attempt(ip_address: str, is_generating_token: bool):
+def register_pass_reset_attempt(ip_address: str, is_generating_token: bool, user_agent: str):
     with current_app.app_context():
         curr_time = datetime.now(timezone.utc)
         db = get_connection()
         cursor = db.cursor()
         
-        cursor.execute("INSERT INTO resetPasswordAttempts(time, ipAddress, isGeneratingToken) VALUES(?,?,?)", (curr_time, ip_address, is_generating_token))
+        cursor.execute("INSERT INTO resetPasswordAttempts(time, ipAddress, isGeneratingToken, userAgent) VALUES(?,?,?,?)", (curr_time, ip_address, is_generating_token, user_agent))
         
         db.commit()
         

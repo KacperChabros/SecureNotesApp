@@ -41,7 +41,7 @@ document.getElementById("addNoteForm").addEventListener("submit", function (even
 
     const titleRegex = /^[a-zA-Z0-9.,!?()\- ]{4,50}$/;
     if (!titleRegex.test(title)){
-        errorMsg += "Title must be between 4 and 50 characters and contain only lowercase, uppercase, digits and following characters: '.,!? ()-' | ";
+        errorMsg += "Title must be between 4 and 50 characters and contain only lowercase, uppercase, digits and following characters: .,!? ()- | ";
     }
 
     if (content.length < 5 || title.length > 2500){

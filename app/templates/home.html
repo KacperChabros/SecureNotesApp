@@ -10,16 +10,12 @@
     <h1>welcome home {{username}}</h1>
     <a href="/logout">Logout</a>
 
-    {% if totp_secret %}
-        <h3>Your secret key for 2FA. Add it in Your authenticator app, You'll need it to log in to the account.<br>{{totp_secret}}</h3>
-    {% endif %}
-
     {% if login_attempts %}
     <div class="error">
         <p>Failed login attempts detected:</p>
         <ul>
             {% for attempt in login_attempts %}
-                <li><strong>Attempt on {{attempt['time']}} from {{ attempt['ipAddress'] }}</strong></li>
+                <li><strong>Attempt on {{attempt['time']}} from {{ attempt['ipAddress'] }} | User Agent: {{ attempt['userAgent'] if attempt['userAgent'] else 'Unknown' }}</strong></li>
             {% endfor %}
         </ul>
     </div>

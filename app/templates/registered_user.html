@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registered successfully</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles/styles.css') }}">
+</head>
+<body>
+    {% if totp_secret %}
+        <h1>Registered successfully!</h1>
+        <h3>Your secret key for 2FA. Add it in Your authenticator app, You'll need it to log in to the account.<br>{{totp_secret}}</h3>
+    {% endif %}
+
+    <a href="/home">Go to home page</a>
+</body>
+</html>

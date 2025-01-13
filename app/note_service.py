@@ -11,7 +11,7 @@ from Crypto.Signature import pkcs1_15
 from Crypto.Random import get_random_bytes
 from passlib.hash import sha256_crypt
 from bleach import clean
-import time
+from datetime import datetime, timezone, timedelta
 import re
 
 def get_notes_created_by_user(userId: int):
@@ -122,8 +122,10 @@ def sign_and_add_note(curr_user_id: int, title: str, content: str, shared_with_u
 
         priv_key_text = decrypt_priv_key(row['privateKeyEncrypted'], user_password)
         if not priv_key_text:
-            time.sleep(0.3)
             return False
+        title = clean_displayed_content(title)
+        content = clean_displayed_content(content)
+
         signature = sign_message(priv_key_text, content)
         del priv_key_text
         del user_password
@@ -146,8 +148,6 @@ def sign_and_add_note(curr_user_id: int, title: str, content: str, shared_with_u
             is_ciphered = True
             content_to_add = encrypted_note
             del note_password
-        else:
-            time.sleep(0.25)
         
         
         db.execute('INSERT INTO notes(userId, title, content, notePasswordHash, sign, isCiphered, isPublic, isShared, sharedToUserId) VALUES (?,?,?,?,?,?,?,?,?)', (curr_user_id, title, content_to_add, note_password_hash, signature, is_ciphered, is_public, is_shared, shared_with_user_id))
@@ -294,3 +294,29 @@ def update_signature(noteId: int, signature: str):
         cursor.execute("UPDATE notes SET sign=? WHERE noteId=?", (signature, noteId))
         db.commit()
         db.close()
+
+def register_note_decrypt_attempt(ip_address: str, user_agent: str, is_success: bool, note_id: int):
+    with current_app.app_context():
+        curr_time = datetime.now(timezone.utc)
+        db = get_connection()
+        cursor = db.cursor()
+
+        cursor.execute("INSERT INTO decryptNoteAttempts(time, ipAddress, userAgent, isSuccess, noteId) VALUES(?,?,?,?,?)", ( curr_time, ip_address, user_agent, is_success, note_id))
+
+        db.commit()
+        
+        db.close()
+
+def is_locked_out_on_note_decrypt(ip_address: str):
+    with current_app.app_context():
+        db = get_connection()
+        cursor = db.cursor()
+        
+        curr_time = datetime.now(timezone.utc)
+        time_threshold = curr_time - timedelta(minutes=15)
+        cursor.execute("SELECT COUNT(*) FROM  decryptNoteAttempts WHERE ipAddress = ? AND isSuccess = 0 AND time >= ?", (ip_address, time_threshold))
+        number_of_attempts = cursor.fetchone()
+        
+        db.close()
+
+        return number_of_attempts[0] >= 5

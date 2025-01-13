@@ -46,7 +46,27 @@ def init_db():
                 time DATETIME NOT NULL,
                 ipAddress TEXT NOT NULL,
                 isSuccess BOOLEAN NOT NULL,
+                userAgent TEXT NULL,
                 FOREIGN KEY (userId) REFERENCES users(id)
+            );
+        ''')
+        db.cursor().execute('''
+            CREATE TABLE IF NOT EXISTS registrationAttempts (
+                attemptId INTEGER PRIMARY KEY AUTOINCREMENT,
+                time DATETIME NOT NULL,
+                ipAddress TEXT NOT NULL,
+                userAgent TEXT NULL            
+            );
+        ''')
+        db.cursor().execute('''
+            CREATE TABLE IF NOT EXISTS decryptNoteAttempts (
+                attemptId INTEGER PRIMARY KEY AUTOINCREMENT,
+                time DATETIME NOT NULL,
+                ipAddress TEXT NOT NULL,
+                userAgent TEXT NULL,
+                isSuccess BOOLEAN NOT NULL,
+                noteId INTEGER NOT NULL,
+                FOREIGN KEY (noteId) REFERENCES notes(noteId)      
             );
         ''')
         db.cursor().execute('''
@@ -65,7 +85,8 @@ def init_db():
                 attemptId INTEGER PRIMARY KEY AUTOINCREMENT,
                 time DATETIME NOT NULL,
                 ipAddress TEXT NOT NULL,
-                isGeneratingToken BOOLEAN NOT NULL
+                isGeneratingToken BOOLEAN NOT NULL,
+                userAgent TEXT NULL
             );
         ''')
 

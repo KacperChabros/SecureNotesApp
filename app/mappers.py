@@ -2,7 +2,7 @@ from note_service import clean_displayed_content
 
 def get_login_attempts_dict(rows):
     login_attempts_dict  = [
-            {"time": row['time'], "ipAddress": row['ipAddress']}
+            {"time": row['time'], "ipAddress": row['ipAddress'], "userAgent": row['userAgent']}
             for row in rows
         ]
     return login_attempts_dict
