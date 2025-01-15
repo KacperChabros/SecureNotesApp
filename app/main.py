@@ -114,7 +114,7 @@ def login():
         return render_template("index.html")
     if request.method == "POST":
         start_time = time.time()
-        min_duration = 0.7 + random.uniform(0, 0.4)
+        min_duration = 1 + random.uniform(0, 0.4)
         is_success = False
         ip_address = request.remote_addr
         user_agent = request.headers.get('User-Agent')
@@ -158,7 +158,7 @@ def register():
         return render_template("register.html")
     if request.method == "POST":
         start_time = time.time()
-        min_duration = 1.7 + random.uniform(0, 0.4)
+        min_duration = 1.8 + random.uniform(0, 0.4)
         ip_address = request.remote_addr
         user_agent = request.headers.get('User-Agent')
         username = request.form.get("username").strip()
@@ -235,7 +235,7 @@ def rendered_note(note_id):
     
     if request.method == "POST":
         start_time = time.time()
-        min_duration = 0.7 + random.uniform(0, 0.4)
+        min_duration = 1 + random.uniform(0, 0.4)
         ip_address = request.remote_addr
         user_agent = request.headers.get('User-Agent')
         note_password = request.form.get("note_password")
@@ -271,7 +271,10 @@ def add_note():
         return redirect("/home")
     if request.method == "POST":
         start_time = time.time()
-        min_duration = 1.1 + random.uniform(0, 0.4)
+        min_duration = 1.8 + random.uniform(0, 0.4)
+        ip_address = request.remote_addr
+        user_agent = request.headers.get('User-Agent')
+
         title = request.form.get("title").strip()
         content = request.form.get("content").strip()
         is_public = 1 if request.form.get("isPublic") == "on" else 0
@@ -281,26 +284,36 @@ def add_note():
         note_password_repeat = request.form.get("note_password_repeat")
         totp_code = request.form.get("totp_code").strip()
 
+        if note_service.is_locked_out_on_add_note(ip_address):
+            flash(f'You have been locked out due to too many failed attempts of adding a note. Try again in 15 minutes.', "error")
+            note_service.register_add_note_attempt(ip_address, user_agent, False)
+            delay_to_min_required_delay(min_duration, start_time)
+            return redirect("/home") 
+
         validation_result = note_service.validate_note_data(title, content, user_password, shared_to_username, note_password, note_password_repeat, totp_code)
         if not validation_result["valid"]:
             for error_key, error_msg in validation_result["errors"].items():
                 flash(f"{error_key}: {error_msg}", 'error')
+            note_service.register_add_note_attempt(ip_address, user_agent, False)
             delay_to_min_required_delay(min_duration, start_time)
             return redirect("/home")  
         
         if not user_service.verify_password_and_totp(current_user, user_password, totp_code):
-            delay_to_min_required_delay(min_duration, start_time)
             flash(f'Wrong credentials provided', "error")
+            note_service.register_add_note_attempt(ip_address, user_agent, False)
+            delay_to_min_required_delay(min_duration, start_time)
             return redirect("/home")  
         
         result = note_service.sign_and_add_note(current_user.userId, title, content, shared_to_username, is_public, user_password, note_password)
         if not result:
-            delay_to_min_required_delay(min_duration, start_time)
             flash(f'There was an error while adding the note', "error")
+            note_service.register_add_note_attempt(ip_address, user_agent, False)
+            delay_to_min_required_delay(min_duration, start_time)
             return redirect("/home") 
 
-        delay_to_min_required_delay(min_duration, start_time)
         flash("Note added successfully!", "success")
+        note_service.register_add_note_attempt(ip_address, user_agent, True)
+        delay_to_min_required_delay(min_duration, start_time)
         return redirect("/home")  
 
 @app.route("/forgot_password", methods=["GET", "POST"])
@@ -340,7 +353,7 @@ def reset_password(token):
     
     if request.method == "POST":
         start_time = time.time()
-        min_duration = 2.2 + random.uniform(0, 0.4)
+        min_duration = 3 + random.uniform(0, 0.4)
         password = request.form.get("password")
         password_repeat = request.form.get("password_repeat")
         ip_address = request.remote_addr

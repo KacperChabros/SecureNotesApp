@@ -6,16 +6,20 @@ from Crypto.PublicKey import RSA
 from Crypto.Cipher import AES
 from Crypto.Protocol.KDF import PBKDF2
 from Crypto.Random import get_random_bytes
-from Crypto.Util.Padding import pad, unpad
 from Crypto.Hash import SHA256
 import base64
 import pyotp
 from datetime import datetime, timezone, timedelta
 import math
 import secrets
-import time
+import os
+from dotenv import load_dotenv
 
+load_dotenv()
 
+TOTP_PEPPER = os.getenv('TOTP_PEPPER', '')
+RSA_PEPPER = os.getenv('RSA_PEPPER', '')
+PEPPER = os.getenv('PEPPER', '')
 
 def get_user_by_username(username: str):
     """Method for getting user by username"""
@@ -251,12 +255,12 @@ def register_user(username: str, email: str, password: str):
     return totp_secret
 
 def hash_password(password: str):
-    return sha256_crypt.hash(password, rounds=550000)
+    return sha256_crypt.hash(password + PEPPER, rounds=550000)
 
 def get_rsa_keys(password: str):
     nonce = get_random_bytes(12)
     salt = get_random_bytes(16)
-    key = PBKDF2(password, salt, dkLen=32)
+    key = PBKDF2(password + RSA_PEPPER, salt, dkLen=32, count=200000)
     cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
 
     keys = RSA.generate(2048)
@@ -280,7 +284,7 @@ def get_totp_secret(password: str):
     totp_secret = pyotp.random_base32()
     salt_totp = get_random_bytes(16)
     nonce_totp = get_random_bytes(12)
-    key_totp = PBKDF2(password, salt_totp, dkLen=32)
+    key_totp = PBKDF2(password + TOTP_PEPPER, salt_totp, dkLen=32, count=200000)
     cipher_totp = AES.new(key_totp, AES.MODE_GCM, nonce=nonce_totp)
     encrypted_totp, tag = cipher_totp.encrypt_and_digest(totp_secret.encode('utf-8'))
     encrypted_totp_secret = base64.b64encode(nonce_totp + salt_totp + tag + encrypted_totp).decode('utf-8')
@@ -295,13 +299,13 @@ def get_totp_secret(password: str):
 
 def verify_password_and_totp(user, password: str, totp_code: str):
     '''Method to check if the credentials are valid'''
-    if sha256_crypt.verify(password, user.password_hash):
+    if sha256_crypt.verify(password + PEPPER, user.password_hash):
         decoded_totp = base64.b64decode(user.totp)
         nonce = decoded_totp[:12]
         salt = decoded_totp[12:28]
         tag = decoded_totp[28:44]
         totp_ciphertext = decoded_totp[44:]
-        key = PBKDF2(password, salt, dkLen=32)
+        key = PBKDF2(password + TOTP_PEPPER, salt, dkLen=32, count=200000)
         cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
         try:
             decrypted_totp_secret = cipher.decrypt_and_verify(totp_ciphertext, tag).decode('utf-8')

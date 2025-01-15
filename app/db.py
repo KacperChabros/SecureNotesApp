@@ -70,6 +70,15 @@ def init_db():
             );
         ''')
         db.cursor().execute('''
+            CREATE TABLE IF NOT EXISTS addNoteAttempts (
+                attemptId INTEGER PRIMARY KEY AUTOINCREMENT,
+                time DATETIME NOT NULL,
+                ipAddress TEXT NOT NULL,
+                userAgent TEXT NULL,
+                isSuccess BOOLEAN NOT NULL
+                );
+        ''')
+        db.cursor().execute('''
             CREATE TABLE IF NOT EXISTS resetPasswordTokens (
                 tokenId INTEGER PRIMARY KEY AUTOINCREMENT,
                 userId INTEGER NOT NULL,

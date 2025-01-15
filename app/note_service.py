@@ -5,7 +5,6 @@ import base64
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import AES
 from Crypto.Protocol.KDF import PBKDF2
-from Crypto.Util.Padding import pad, unpad
 from Crypto.Hash import SHA256
 from Crypto.Signature import pkcs1_15
 from Crypto.Random import get_random_bytes
@@ -13,6 +12,14 @@ from passlib.hash import sha256_crypt
 from bleach import clean
 from datetime import datetime, timezone, timedelta
 import re
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+TOTP_PEPPER = os.getenv('TOTP_PEPPER', '')
+RSA_PEPPER = os.getenv('RSA_PEPPER', '')
+NOTE_PEPPER = os.getenv('NOTE_PEPPER', '')
 
 def get_notes_created_by_user(userId: int):
     """Method for getting all user's notes"""
@@ -162,7 +169,7 @@ def decrypt_priv_key(encrypted_priv_key, user_password):
     salt_d = decoded_priv_key[12:28]
     tag_d = decoded_priv_key[28:44]
     ciphertext_d = decoded_priv_key[44:]
-    key_d = PBKDF2(user_password, salt_d, dkLen=32)
+    key_d = PBKDF2(user_password + RSA_PEPPER, salt_d, dkLen=32, count=200000)
     cipher = AES.new(key_d, AES.MODE_GCM, nonce=nonce_d)
     retrieved_priv_key = None
     try:
@@ -182,7 +189,7 @@ def decrypt_priv_key(encrypted_priv_key, user_password):
 def encrypt_note(note_password: str, content: str):
     nonce = get_random_bytes(12)
     salt = get_random_bytes(16)
-    key = PBKDF2(note_password, salt, dkLen=32)
+    key = PBKDF2(note_password + NOTE_PEPPER, salt, dkLen=32, count=200000)
     cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
     encrypted_note_content, tag = cipher.encrypt_and_digest(content.encode('utf-8'))
     encrypted_note_base64 = base64.b64encode(nonce + salt + tag + encrypted_note_content).decode('utf-8')
@@ -228,7 +235,7 @@ def decrypt_note(note_password: str, note_password_hash: str, encrypted_note: st
     salt = decoded_note[12:28]
     tag = decoded_note[28:44]
     note_ciphertext = decoded_note[44:]
-    key = PBKDF2(note_password, salt, dkLen=32)
+    key = PBKDF2(note_password + NOTE_PEPPER, salt, dkLen=32, count=200000)
     cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
     decrypted_note = None
     try:
@@ -307,6 +314,18 @@ def register_note_decrypt_attempt(ip_address: str, user_agent: str, is_success: 
         
         db.close()
 
+def register_add_note_attempt(ip_address: str, user_agent: str, is_success: bool):
+    with current_app.app_context():
+        curr_time = datetime.now(timezone.utc)
+        db = get_connection()
+        cursor = db.cursor()
+
+        cursor.execute("INSERT INTO addNoteAttempts(time, ipAddress, userAgent, isSuccess) VALUES(?,?,?,?)", ( curr_time, ip_address, user_agent, is_success))
+
+        db.commit()
+        
+        db.close()
+
 def is_locked_out_on_note_decrypt(ip_address: str):
     with current_app.app_context():
         db = get_connection()
@@ -315,6 +334,20 @@ def is_locked_out_on_note_decrypt(ip_address: str):
         curr_time = datetime.now(timezone.utc)
         time_threshold = curr_time - timedelta(minutes=15)
         cursor.execute("SELECT COUNT(*) FROM  decryptNoteAttempts WHERE ipAddress = ? AND isSuccess = 0 AND time >= ?", (ip_address, time_threshold))
+        number_of_attempts = cursor.fetchone()
+        
+        db.close()
+
+        return number_of_attempts[0] >= 5
+    
+def is_locked_out_on_add_note(ip_address: str):
+    with current_app.app_context():
+        db = get_connection()
+        cursor = db.cursor()
+        
+        curr_time = datetime.now(timezone.utc)
+        time_threshold = curr_time - timedelta(minutes=15)
+        cursor.execute("SELECT COUNT(*) FROM  addNoteAttempts WHERE ipAddress = ? AND isSuccess = 0 AND time >= ?", (ip_address, time_threshold))
         number_of_attempts = cursor.fetchone()
         
         db.close()
