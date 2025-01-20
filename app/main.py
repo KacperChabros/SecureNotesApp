@@ -96,6 +96,10 @@ def add_csp_header(response):
     response.headers['Content-Security-Policy'] = csp_policy
     return response
 
+@app.route('/favicon.ico')
+def empty_favicon():
+    return '', 204
+
 @login_manager.unauthorized_handler
 def unauthorized():
     flash("Please, log in to access this website")
