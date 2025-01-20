@@ -9,6 +9,4 @@ RUN /opt/venv/bin/pip install --upgrade pip
 RUN /opt/venv/bin/pip install --no-cache-dir -r requirements.txt
 ENV PATH="/opt/venv/bin:$PATH"
 
-#RUN pip install --no-cache-dir -r requirements.txt
-
 CMD ["uwsgi", "--ini", "uwsgi.ini"]
